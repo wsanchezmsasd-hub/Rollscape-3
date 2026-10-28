@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ROLLSCAPE</title><link rel="stylesheet" href="style.css">
+  <!-- Connect to Google's Font Servers -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<!-- Audiowide -->
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
+</head>
+<body>
+<h1>ROLLSCAPE</h1>
+<canvas id="game" width="800" height="400"></canvas>
+<p id="message">Loading...</p>
+<div id="class-choice" hidden><h2>Choose your class</h2><div id="class-cards"></div></div>
+<div id="enemy-choice" hidden><h2>Choose your next enemy</h2><div id="enemy-cards"></div></div>
+<div id="blessing-choice" hidden><h2>Spend your gold tesseracts</h2><p>Gold: <span id="blessing-gold">0</span></p><div id="blessing-cards"></div><h3 id="upgrade-heading">One-time upgrades</h3><div id="upgrade-cards"></div><div id="blessing-continue"></div></div>
+<div id="curse-choice" hidden><h2>Choose a curse</h2><div id="curse-cards"></div></div>
+<p class="controls">LEFT / RIGHT or A / D to roll &nbsp;&middot;&nbsp; SPACE to jump &nbsp;&middot;&nbsp; MOUSE1 to fire &nbsp;&middot;&nbsp; E to use your ability &nbsp;&middot;&nbsp; R to restart</p>
+<script src="js/config.js"></script><script src="js/input.js"></script><script src="js/level.js"></script><script src="js/collide.js"></script><script src="js/player.js"></script><script src="js/weapons.js"></script><script src="js/enemy.js"></script><script src="js/enemy_extra.js"></script><script src="js/mold.js"></script><script src="js/draw.js"></script><script src="js/game.js"></script><script src="js/main.js"></script>
+</body>
+</html>
