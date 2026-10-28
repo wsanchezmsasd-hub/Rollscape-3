@@ -1,0 +1,25 @@
+{
+  "_comment": "A level is just a list of piece names in order. Every name you use here must exist in data/pieces.json.",
+  "levels": [
+    {
+      "name": "Level 1 -  Hello world",
+      "pieces": ["platform", "gap", "spawn", "spikes", "flat"]
+    },
+    {
+      "name": "Level 2 - Watch Your Step",
+      "pieces": ["spikes", "gap", "platform", "highplat", "spawn", "flat", "gap", "flat"]
+    },
+    {
+      "name": "Level 3 - Bunker",
+      "pieces": ["spikes", "step", "stairs", "highflat", "spawn", "highflat", "highplat", "highflat"]
+    },
+    {
+      "name": "Level 4 - Gaps",
+      "pieces": ["gap", "platform", "flat", "manygap", "spawn", "manyspikes", "highflat", "thornplatform", "highplat", "gap"]
+    },
+    {
+      "name": "Level 5 - Goodbye World",
+      "pieces": ["spikes", "gap", "platform", "spawn", "highplat", "step", "highflat", "manygap", "stairs", "highplat", "spikepit"]
+    }
+  ]
+}

@@ -7,10 +7,10 @@ var Level = {
 };
 
 Level.loadData = function (whenDone) {
-  fetch("data/pieces.json").then(function (r) { if (!r.ok) throw new Error("Could not load data/pieces.json"); return r.json(); }).then(function (piecesFile) {
+  fetch("pieces.json").then(function (r) { if (!r.ok) throw new Error("Could not load pieces.json"); return r.json(); }).then(function (piecesFile) {
     Level.pieces = piecesFile;
-    return fetch("data/levels.json");
-  }).then(function (r) { if (!r.ok) throw new Error("Could not load data/levels.json"); return r.json(); }).then(function (levelsFile) {
+    return fetch("levels.json");
+  }).then(function (r) { if (!r.ok) throw new Error("Could not load levels.json"); return r.json(); }).then(function (levelsFile) {
     Level.levels = levelsFile.levels;
     whenDone();
   }).catch(function (error) {
@@ -27,7 +27,7 @@ Level.build = function (levelNumber) {
   for (var row = 0; row < CONFIG.ROWS; row++) { Level.grid.push(""); }
   for (var p = 0; p < level.pieces.length; p++) {
     var piece = Level.pieces[level.pieces[p]];
-    if (!piece) { console.error("No piece named '" + level.pieces[p] + "' in data/pieces.json"); piece = Level.pieces.flat; }
+    if (!piece) { console.error("No piece named '" + level.pieces[p] + "' in pieces.json"); piece = Level.pieces.flat; }
     if (Level.pieceHasStartOrFinish(level.pieces[p])) Level.protectedPieceIndices.push(p);
     for (var r = 0; r < CONFIG.ROWS; r++) { Level.grid[r] += piece[r]; }
   }
