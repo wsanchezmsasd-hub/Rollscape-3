@@ -52,6 +52,7 @@ Level.arrangePieces = function (names) {
   return arranged;
 };
 Level.getDefinition = function (levelNumber) {
+  if (Game.commandLevelDefinition) return Game.commandLevelDefinition;
   if (levelNumber < Level.levels.length) return Level.levels[levelNumber];
   var source = Level.levels[levelNumber % Level.levels.length];
   var pieces = source.pieces.filter(function (pieceName) { return !Level.pieceHasStartOrFinish(pieceName); });
