@@ -12,7 +12,7 @@
 function enemySeconds(frames) { return Math.round(frames / 60 * 100) / 100; }
 
 var Enemy = {
-  type: null, types: [], enemies: [], bullets: [], explosions: [], portals: [], history: [], frame: 0,
+  type: null, types: [], enemies: [], bullets: [], explosions: [], portals: [], history: [], frame: 0, aiPaused: false,
   choices: [
     { type: "cuboid", name: "Cuboid", description: "Two large, slippery cubes follow you and are knocked back by damage." },
     { type: "drone", name: "Drone", description: "25 HP. Respawns after 3.5 seconds and fires short, slow bursts." },
@@ -54,6 +54,7 @@ Enemy.angleDiff = function (to, from) { var d = to - from; while (d > Math.PI) d
 Enemy.resetRoster = function () { Enemy.types = []; Enemy.type = null; };
 Enemy.reset = function (type, resetRoster) {
   if (resetRoster) Enemy.resetRoster();
+  Enemy.aiPaused = false;
   if (type) Enemy.types.push(type);
   Enemy.type = Enemy.types.length === 1 ? Enemy.types[0] : (Enemy.types.length ? "mixed" : null);
   Enemy.enemies = []; Enemy.bullets = []; Enemy.explosions = []; Enemy.portals = []; Enemy.history = []; Enemy.frame = 0;
@@ -170,6 +171,7 @@ Enemy.makeEnemy = function (type, x, y, radius, hp, respawnFrames, opts) {
 
 // ---------------------------------------------------------------- the loop
 Enemy.update = function () {
+  if (Enemy.aiPaused) return;
   Enemy.frame++;
   Enemy.recordPlayer();
   Enemy.updatePortals();

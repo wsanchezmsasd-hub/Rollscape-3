@@ -53,7 +53,7 @@ Draw.everything = function () {
   var ctx = Draw.ctx;
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
-  Draw.updateParticles();
+  if (Game.mode !== "command") Draw.updateParticles();
   Draw.drawParticles();
   ctx.save();
   ctx.translate(-Draw.cameraX, 0);
@@ -79,7 +79,7 @@ Draw.world = function () {
     var atRisk = warning && warningCols.indexOf(col) >= 0;
     if (here === "#") { if (atRisk) Draw.blockWarning(x, y, size); else Draw.block(x, y, size); }
     if (here === "^") { if (atRisk) Draw.spikeWarning(x, y, size); else Draw.spike(x, y, size); }
-    if (here === "F") Draw.finish(x, y, size);
+    if (here === "F" && Level.goldActive) Draw.finish(x, y, size);
   }
   if (warning && warningCols.length) {
     var spanStart = Math.min.apply(null, warningCols) * size, spanEnd = (Math.max.apply(null, warningCols) + 1) * size;

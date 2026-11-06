@@ -1,5 +1,5 @@
 /* Hidden run editor. Hold Shift + Alt for one second, then enter FLOPPA. */
-var CommandPanel = { holdTimer: null, shift: false, alt: false, previousMode: "playing", pieces: [], enemies: [], open: false };
+var CommandPanel = { holdTimer: null, shift: false, alt: false, previousMode: "playing", pieces: [], enemies: [], open: false, unlocked: false, configDefaults: null, savedPresetKey: "rollscape-command-preset" };
 
 CommandPanel.start = function () {
   document.addEventListener("keydown", function (event) {
@@ -14,6 +14,7 @@ CommandPanel.start = function () {
     if (event.key === "Alt") CommandPanel.alt = false;
     if (!CommandPanel.shift || !CommandPanel.alt) { window.clearTimeout(CommandPanel.holdTimer); CommandPanel.holdTimer = null; }
   });
+  CommandPanel.configDefaults = JSON.parse(JSON.stringify(CONFIG));
   document.getElementById("command-password-submit").addEventListener("click", CommandPanel.unlock);
   document.getElementById("command-password-cancel").addEventListener("click", CommandPanel.closePassword);
   document.getElementById("command-password-input").addEventListener("keydown", function (event) { if (event.key === "Enter") CommandPanel.unlock(); });
@@ -23,6 +24,7 @@ CommandPanel.prompt = function () {
   CommandPanel.holdTimer = null;
   if (!CommandPanel.shift || !CommandPanel.alt) return;
   CommandPanel.previousMode = Game.mode;
+  if (CommandPanel.unlocked) { CommandPanel.openPanel(); return; }
   document.getElementById("command-password").hidden = false;
   var input = document.getElementById("command-password-input"); input.value = ""; input.focus();
 };
@@ -30,11 +32,13 @@ CommandPanel.closePassword = function () { document.getElementById("command-pass
 CommandPanel.unlock = function () {
   var input = document.getElementById("command-password-input");
   if (input.value !== "FLOPPA") { CommandPanel.closePassword(); return; }
+  CommandPanel.unlocked = true;
   CommandPanel.closePassword(); CommandPanel.openPanel();
 };
 CommandPanel.openPanel = function () {
   CommandPanel.open = true; Game.mode = "command";
-  CommandPanel.pieces = ["start", "flat", "finish"];
+  var definition = Level.getDefinition(Game.levelNumber);
+  CommandPanel.pieces = definition && definition.pieces ? definition.pieces.slice() : ["spawn"];
   CommandPanel.enemies = Enemy.types.slice();
   document.getElementById("command-panel").hidden = false;
   CommandPanel.render();
@@ -42,6 +46,87 @@ CommandPanel.openPanel = function () {
 CommandPanel.close = function () {
   CommandPanel.open = false; document.getElementById("command-panel").hidden = true;
   Game.mode = CommandPanel.previousMode === "command" ? "playing" : CommandPanel.previousMode;
+};
+CommandPanel.button = function (label, onClick) {
+  var button = document.createElement("button"); button.textContent = label; button.addEventListener("click", onClick); return button;
+};
+CommandPanel.closeAnd = function (action) { CommandPanel.close(); action(); };
+CommandPanel.resetConfig = function () {
+  var restored = JSON.parse(JSON.stringify(CommandPanel.configDefaults));
+  Object.keys(CONFIG).forEach(function (key) { delete CONFIG[key]; });
+  Object.keys(restored).forEach(function (key) { CONFIG[key] = restored[key]; });
+  CommandPanel.render();
+};
+CommandPanel.restartRun = function () {
+  var pieces = CommandPanel.pieces.slice(), enemies = CommandPanel.enemies.slice();
+  CommandPanel.closeAnd(function () { Game.startCommandLevel({ name: "Command level", pieces: pieces }, enemies); });
+};
+CommandPanel.advanceLevel = function () { CommandPanel.closeAnd(function () { Game.nextLevel(); }); };
+CommandPanel.loseLevel = function () {
+  CommandPanel.close();
+  Game.levelNumber = CONFIG.START_LEVEL;
+  Game.mode = "dead";
+  Game.showMessage("Command action: level failed. Press R to return to class select.");
+};
+CommandPanel.playerState = function () {
+  var box = document.createElement("div"), grid = document.createElement("div"); grid.className = "command-grid";
+  grid.appendChild(CommandPanel.field("X position", Math.round(Player.x), function (value) { Player.x = Math.max(0, value); }));
+  grid.appendChild(CommandPanel.field("Y position", Math.round(Player.y), function (value) { Player.y = value; }));
+  grid.appendChild(CommandPanel.field("Horizontal velocity", Player.vx, function (value) { Player.vx = value; }));
+  grid.appendChild(CommandPanel.field("Vertical velocity", Player.vy, function (value) { Player.vy = value; }));
+  grid.appendChild(CommandPanel.field("Invincible", Player.invincibilityTimer > 0, function (value) { Player.invincibilityTimer = value ? 999999 : 0; }));
+  grid.appendChild(CommandPanel.field("Ammo", Weapons.ammo, function (value) { Weapons.ammo = Math.max(0, Math.floor(value)); Weapons.reloadTimer = 0; }));
+  grid.appendChild(CommandPanel.field("Ability cooldown", Weapons.abilityCooldown, function (value) { Weapons.abilityCooldown = Math.max(0, Math.floor(value)); }));
+  grid.appendChild(CommandPanel.field("Dash cooldown", Player.dashCooldown, function (value) { Player.dashCooldown = Math.max(0, Math.floor(value)); }));
+  box.appendChild(grid);
+  var grant = document.createElement("div");
+  grant.appendChild(CommandPanel.button("Clear fake tesseract hit", function () { Player.fakeTesseractHit = false; }));
+  grant.appendChild(CommandPanel.button("Grant red tesseracts", function () { Level.redTesseracts.forEach(function (item) { item.collected = true; }); }));
+  grant.appendChild(CommandPanel.button("Grant 10 gold", function () { Game.goldTesseracts += 10; }));
+  grant.appendChild(CommandPanel.button("Refill ammo", function () { var stats = CONFIG.CLASS_STATS[Player.classType]; Weapons.ammo = stats ? stats.ammo + Game.blessings.ammo * CONFIG.BLESSING_EFFECTS.ammoBonus : 0; Weapons.reloadTimer = 0; }));
+  box.appendChild(grant); return box;
+};
+CommandPanel.enemyControls = function () {
+  var box = document.createElement("div"), choices = Enemy.choices.map(function (choice) { return { type: choice.type, name: choice.name }; });
+  choices = choices.concat(Enemy.choices.map(function (choice) { return { type: "dim_" + choice.type, name: "Dimensional " + choice.name }; }));
+  var select = document.createElement("select"); choices.forEach(function (choice) { var option = document.createElement("option"); option.value = choice.type; option.textContent = choice.name; select.appendChild(option); });
+  box.appendChild(select);
+  box.appendChild(CommandPanel.button("Spawn at player", function () { Enemy.spawnType(select.value, Player.x + CONFIG.PLAYER_SIZE * 3, Player.y); }));
+  box.appendChild(CommandPanel.button("Spawn at cursor", function () { Enemy.spawnType(select.value, Input.mouseX, Input.mouseY); }));
+  box.appendChild(CommandPanel.button("Remove all enemies", function () { Enemy.enemies = []; Enemy.bullets = []; Enemy.explosions = []; Enemy.portals = []; }));
+  box.appendChild(CommandPanel.button("Kill all enemies", function () { Enemy.enemies.forEach(function (enemy) { Enemy.kill(enemy); }); }));
+  box.appendChild(CommandPanel.button("Toggle enemy AI", function () { Enemy.aiPaused = !Enemy.aiPaused; this.textContent = Enemy.aiPaused ? "Enable enemy AI" : "Disable enemy AI"; }));
+  return box;
+};
+CommandPanel.randomize = function () {
+  function shuffle(items) { return items.slice().sort(function () { return Math.random() - 0.5; }); }
+  var pieceNames = Object.keys(Level.pieces).filter(function (name) { return name.charAt(0) !== "_"; });
+  CommandPanel.pieces = ["spawn"].concat(shuffle(pieceNames).slice(0, 4));
+  CommandPanel.enemies = shuffle(Enemy.choices.map(function (choice) { return choice.type; })).slice(0, 3);
+  Game.blessingOffers = [Game.nextBlessingOffer(), Game.nextBlessingOffer()];
+  Game.curses = [Game.curseChoices[Math.floor(Math.random() * Game.curseChoices.length)].id];
+  CommandPanel.render();
+};
+CommandPanel.savePreset = function () { localStorage.setItem(CommandPanel.savedPresetKey, JSON.stringify({ pieces: CommandPanel.pieces, enemies: CommandPanel.enemies, curses: Game.curses, blessings: Game.blessings, upgrades: Game.upgrades })); };
+CommandPanel.loadPreset = function () {
+  var raw = localStorage.getItem(CommandPanel.savedPresetKey); if (!raw) return;
+  var preset = JSON.parse(raw);
+  if (Array.isArray(preset.pieces)) CommandPanel.pieces = preset.pieces;
+  if (Array.isArray(preset.enemies)) CommandPanel.enemies = preset.enemies;
+  if (Array.isArray(preset.curses)) Game.curses = preset.curses;
+  if (preset.blessings) Game.blessings = preset.blessings;
+  if (preset.upgrades) Game.upgrades = preset.upgrades;
+  CommandPanel.render();
+};
+CommandPanel.exportPreset = function () {
+  var data = JSON.stringify({ pieces: CommandPanel.pieces, enemies: CommandPanel.enemies, curses: Game.curses, blessings: Game.blessings, upgrades: Game.upgrades }, null, 2);
+  var link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([data], { type: "application/json" })); link.download = "rollscape-command-preset.json"; link.click(); URL.revokeObjectURL(link.href);
+};
+CommandPanel.importPreset = function () {
+  var raw = window.prompt("Paste a command preset JSON:");
+  if (!raw) return;
+  try { var preset = JSON.parse(raw); localStorage.setItem(CommandPanel.savedPresetKey, JSON.stringify(preset)); CommandPanel.loadPreset(); }
+  catch (error) { window.alert("Invalid command preset JSON."); }
 };
 CommandPanel.section = function (title, content) { var section = document.createElement("details"); section.className = "command-section"; var summary = document.createElement("summary"); summary.textContent = title; section.appendChild(summary); section.appendChild(content); return section; };
 CommandPanel.field = function (label, value, onChange) {
@@ -98,8 +183,9 @@ CommandPanel.renderCurses = function () {
 };
 CommandPanel.renderBuilder = function () {
   var box = document.createElement("div"), pieceNames = Object.keys(Level.pieces).filter(function (name) { return name.charAt(0) !== "_"; }), add = document.createElement("select");
-  pieceNames.forEach(function (name) { var option = document.createElement("option"); option.value = name; option.textContent = name; add.appendChild(option); }); var addButton = document.createElement("button"); addButton.textContent = "Add piece"; addButton.onclick = function () { CommandPanel.pieces.push(add.value); CommandPanel.render(); }; box.appendChild(add); box.appendChild(addButton);
-  var list = document.createElement("div"); list.className = "command-list"; CommandPanel.pieces.forEach(function (name, index) { var row = document.createElement("span"); row.textContent = (index + 1) + ". " + name; if (name !== "start" && name !== "finish") { var remove = document.createElement("button"); remove.textContent = "Remove"; remove.onclick = function () { CommandPanel.pieces.splice(index, 1); CommandPanel.render(); }; row.appendChild(remove); } list.appendChild(row); }); box.appendChild(list); return box;
+  pieceNames.forEach(function (name) { var option = document.createElement("option"); option.value = name; option.textContent = name; add.appendChild(option); });
+  ["left", "right"].forEach(function (side) { var addButton = document.createElement("button"); addButton.textContent = "Add " + side; addButton.onclick = function () { var index = side === "left" ? 0 : CommandPanel.pieces.length; CommandPanel.pieces.splice(index, 0, add.value); CommandPanel.render(); }; box.appendChild(addButton); }); box.insertBefore(add, box.firstChild);
+  var list = document.createElement("div"); list.className = "command-list"; CommandPanel.pieces.forEach(function (name, index) { var row = document.createElement("span"); row.textContent = (index + 1) + ". " + name; if (name !== "spawn") { var remove = document.createElement("button"); remove.textContent = "Remove"; remove.onclick = function () { CommandPanel.pieces.splice(index, 1); CommandPanel.render(); }; row.appendChild(remove); } list.appendChild(row); }); box.appendChild(list); return box;
 };
 CommandPanel.renderEnemies = function () {
   var box = document.createElement("div"), choices = Enemy.choices.map(function (choice) { return { type: choice.type, name: choice.name }; });
@@ -111,10 +197,23 @@ CommandPanel.render = function () {
   var root = document.getElementById("command-sections"); root.innerHTML = "";
   root.appendChild(CommandPanel.section("Config values", CommandPanel.renderConfig()));
   root.appendChild(CommandPanel.section("Shop items and stacks", CommandPanel.renderShop())); root.appendChild(CommandPanel.section("Curse stacks", CommandPanel.renderCurses())); root.appendChild(CommandPanel.section("Build a level", CommandPanel.renderBuilder())); root.appendChild(CommandPanel.section("Enemy stacks", CommandPanel.renderEnemies()));
-  var actions = document.createElement("div"); actions.className = "command-actions"; var apply = document.createElement("button"); apply.textContent = "Apply custom run"; apply.onclick = CommandPanel.apply; actions.appendChild(apply); root.appendChild(actions);
+  root.appendChild(CommandPanel.section("Player state", CommandPanel.playerState()));
+  root.appendChild(CommandPanel.section("Live enemy controls", CommandPanel.enemyControls()));
+  var presets = document.createElement("div"); presets.appendChild(CommandPanel.button("Save preset", CommandPanel.savePreset)); presets.appendChild(CommandPanel.button("Load preset", CommandPanel.loadPreset)); presets.appendChild(CommandPanel.button("Randomize run", CommandPanel.randomize)); presets.appendChild(CommandPanel.button("Export preset", CommandPanel.exportPreset)); presets.appendChild(CommandPanel.button("Import preset", CommandPanel.importPreset)); root.appendChild(CommandPanel.section("Preset management", presets));
+  var actions = document.createElement("div"); actions.className = "command-actions";
+  actions.appendChild(CommandPanel.button("Restart current custom run", CommandPanel.restartRun));
+  actions.appendChild(CommandPanel.button("Skip to next level", CommandPanel.advanceLevel));
+  actions.appendChild(CommandPanel.button("Win current level", CommandPanel.advanceLevel));
+  actions.appendChild(CommandPanel.button("Lose current level", CommandPanel.loseLevel));
+  actions.appendChild(CommandPanel.button("Reset all config values", CommandPanel.resetConfig));
+  actions.appendChild(CommandPanel.button("Pause / unpause game", CommandPanel.close));
+  root.appendChild(CommandPanel.section("Quick actions", actions));
+  var applyActions = document.createElement("div"); applyActions.className = "command-actions";
+  applyActions.appendChild(CommandPanel.button("Apply changes", CommandPanel.apply));
+  root.appendChild(applyActions);
 };
 CommandPanel.apply = function () {
-  var pieces = CommandPanel.pieces.slice(); if (pieces.indexOf("start") < 0) pieces.unshift("start"); if (pieces.indexOf("finish") < 0) pieces.push("finish");
+  var pieces = CommandPanel.pieces.filter(function (name) { return name !== "start" && name !== "finish"; }); if (pieces.indexOf("spawn") < 0) pieces.unshift("spawn");
   Game.startCommandLevel({ name: "Command level", pieces: pieces }, CommandPanel.enemies); CommandPanel.close();
 };
 window.addEventListener("load", CommandPanel.start);
