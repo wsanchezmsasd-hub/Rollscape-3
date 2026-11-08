@@ -1,3 +1,43 @@
+# ROLLSCAPE – content pass 3
+
+New files: `features.js` (all new logic), `draw_extra.js` (the new look + drawing for new content). Both are already in `index.html`. All numbers are in `config.js` (bottom of the file: `BEACON`, `VERTICAL`, `ALTAR`, `TAR`, `CURSES.subZero` ... `CURSES.ak47`).
+Replaced in `draw.js` (removed there, rewritten in `draw_extra.js`): `everything, world, tesseract, block, blockWarning, spike, spikeWarning, finish, enemies, hud, player`.
+
+## Level
+- **Beacon of light** replaces the Finish flag. It hovers above the spawn piece's platform and opens when all red tesseracts are collected. Touch the orb to win. An arrow at the screen edge points to it.
+- **Collapse now leaves only the spawn piece** (`COLLAPSE_MAP_FRACTION` 0.5 -> 1, and the old finish piece is no longer protected).
+- **Verticality**: each piece has a `VERTICAL.platformChance` of getting a high platform with 1-2 tesseracts (placed first, so they tend to be gold) plus a mint **jump pad** on the ground nearby. Pads solve their launch speed from their own height, so they work under any gravity.
+- **Altars** (1-2 per level from level 4, interact with **F**): short pillars with a symbol. Single use.
+  - *Chance*: one roll. A buff (free blessing / gold / 8s shield), a nerf (portals / a 1-round temporary curse / lose gold) or a level change (gravity up/down, faster collapse, enemies slower/faster).
+  - *Duality*: pick 1 of 3 buff + nerf pairs that last the run (Glass Cannon, Machine Spirit = free Matrix, Rocket Heart = free Jet Boots, Hoarder's Bargain, Featherfall).
+  - *Greed*: gold tesseracts x2 this level, 7 portals of enemies.
+  - *Curses*: take a temporary (+10 gold) or Greater (+25 gold) curse.
+
+## Domino
+It now flies through terrain. If you stand on something it lands on that surface (or the first surface under the spot it aimed at, so a high offset past a platform edge drops it to the ground). If you are airborne it ignores platforms and falls to the bottom. A magenta ring on the landing surface shows where. If it comes down inside terrain it stands there without solid collision until its next leap.
+
+## Curses
+Curses now have a kind: permanent, **temporary** (counts down once per completed level) and **Greater** (rare card, 20% chance for one slot; permanent, no stacking). HUD: temporary shows rounds left, Greater has a diamond.
+- **Sub-Zero** (permanent, *replaces Rough Edging*): 3 frozen 5-column chunks; friction 0.994, acceleration x0.3.
+- **Adware** (3 rounds): popup ads over the game offering a blessing. BUY actually buys it; X unlocks after 1.8s; a failed buy moves the ad.
+- **Diamond Cuboid** (2 rounds): when the map starts collapsing, a cuboid (an existing one if there is one) grows huge and is the beacon. It flees, and comes home once only the spawn piece is left. Touch it to win.
+- **Moldy Aura** (2 rounds): rolling sometimes molds the block under you. Mold grows and buds without a core while the curse is active.
+- **Heartbreaker** (Greater): 15s timer, +4s per tesseract, capped at 20s. At zero you explode.
+- **AK-47** (Greater): replaces weapon and ability. Click = one 7-damage shot (not automatic). E throws it; it flies, comes back, and smacks you a little.
+- **Tar** (Greater): a tar clock spawns a cog every 10s. Miss 2 and it wakes and chases you (flying, speeds up). Collect 3 cogs to put it back to sleep; while awake cogs spawn every 5s.
+
+## Look
+Gradient void with parallax monoliths, lit rock with bright top lips and cracks, glowing spikes, spinning glowing tesseracts, a shaded player with trail, per-enemy glow, drone/drill/cuboid/ball details, spark bursts and screen shake on explosions, vignette, and a panel-based HUD (ammo, reload bar, curses with kinds).
+
+## Under the hood
+`Game.mods` (run-wide) and `Game.levelMods` (this level) hold gravity, damage, enemy speed/cooldown, gold and collapse multipliers. Altars write to them; player/enemy/level code reads them.
+
+## Interpretation notes
+- "Beacon above the platform": placed above the spawn piece's raised platform (3 tiles up), so you jump up to it.
+- "Level 4" = the 4th level (index 3), set by `ALTAR.firstLevel`.
+
+---
+
 # ROLLSCAPE – content pass 2
 
 All numbers are in `js/config.js`. New files: `js/enemy_extra.js`, `js/mold.js` (add both to `index.html`, already done). `js/enemy.js` was rewritten in a readable multi-line style; existing enemy behaviour is unchanged except where listed.

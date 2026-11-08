@@ -12,6 +12,7 @@ var Input = {
   jump: false,
   restart: false,
   ability: false,
+  interact: false,
   mouseDown: false,
   mouseX: 0,
   mouseY: 0
@@ -42,4 +43,5 @@ function setKey(key, isDown) {
   if (key === "ArrowUp"    || key === " " || key === "w" || key === "W") { Input.jump = isDown; }
   if (key === "r" || key === "R") { Input.restart = isDown; }
   if (key === "e" || key === "E") { Input.ability = isDown; }
+  if (key === "f" || key === "F") { Input.interact = isDown; }
 }

@@ -13,7 +13,7 @@ Player.clampVelocity = function () {
   if (Player.vy > CONFIG.MAX_VERTICAL_SPEED) Player.vy = CONFIG.MAX_VERTICAL_SPEED;
   if (Player.vy < -CONFIG.MAX_VERTICAL_SPEED) Player.vy = -CONFIG.MAX_VERTICAL_SPEED;
 };
-Player.gravity = function () { return CONFIG.GRAVITY * Math.pow(CONFIG.CURSES.lowerGravity.gravityMultiplier, Game.curseCount("lowerGravity")); };
+Player.gravity = function () { return CONFIG.GRAVITY * Math.pow(CONFIG.CURSES.lowerGravity.gravityMultiplier, Game.curseCount("lowerGravity")) * Game.levelMods.gravity * Game.mods.gravity; };
 // Real apex (px) of a jump. Mirrors Player.update: the body moves 1px at a time, so each frame rises ceil(speed) px.
 Player.jumpApex = function (power, gravity) {
   var vy = -power + gravity, rise = 0;
@@ -23,7 +23,7 @@ Player.jumpApex = function (power, gravity) {
 // Lower Gravity: each stack makes you jump a bit lower, but never below CURSES.lowerGravity.minJumpHeight
 // (3-tile ledges need ~120px, so an unbounded penalty can make a level impossible).
 Player.jumpPower = function () {
-  var base = CONFIG.JUMP_POWER + Game.blessings.jump * CONFIG.BLESSING_EFFECTS.jumpPower + (Game.levelNumber >= 2 ? CONFIG.LATER_LEVEL_JUMP_BONUS : 0);
+  var base = CONFIG.JUMP_POWER + Game.blessings.jump * CONFIG.BLESSING_EFFECTS.jumpPower + (Game.levelNumber >= 2 ? CONFIG.LATER_LEVEL_JUMP_BONUS : 0) + Game.mods.jumpAdd;
   var stacks = Game.curseCount("lowerGravity");
   if (!stacks) return base;
   var curse = CONFIG.CURSES.lowerGravity, g = Player.gravity(), normalApex = Player.jumpApex(base, CONFIG.GRAVITY);
@@ -53,10 +53,11 @@ Player.update = function () {
   }
   var size = CONFIG.PLAYER_SIZE;
   var matrix = Game.upgrades.matrix, dir = (Input.right ? 1 : 0) - (Input.left ? 1 : 0);
+  Level.ensureIce(); var ice = Level.onIce(); // Sub-Zero: frozen chunks are super slippery
   // With the Matrix Tesseract, vx only holds KNOCKBACK (it bleeds off quickly); your own movement is a flat speed added on top.
-  if (matrix) { Player.vx *= (Player.onGround ? 0.8 : 0.9); if (Math.abs(Player.vx) < 0.15) Player.vx = 0; }
-  else if (!Input.left && !Input.right) { Player.vx *= (Player.onGround ? 0.85 : 0.95); if (Math.abs(Player.vx) < 0.15) Player.vx = 0; }
-  var movement = (CONFIG.MOVE_SPEED + Game.blessings.speed * CONFIG.BLESSING_EFFECTS.moveAcceleration) * Math.pow(CONFIG.CURSES.roughEdging.movementMultiplier, Game.curseCount("roughEdging")) * (Weapons.parrySlowTimer > 0 ? CONFIG.KATANA_PARRY_SLOW_MULTIPLIER : 1);
+  if (matrix) { Player.vx *= (Player.onGround ? (ice ? CONFIG.CURSES.subZero.friction : 0.8) : 0.9); if (Math.abs(Player.vx) < 0.15) Player.vx = 0; }
+  else if (!Input.left && !Input.right) { Player.vx *= (Player.onGround ? (ice ? CONFIG.CURSES.subZero.friction : 0.85) : 0.95); if (Math.abs(Player.vx) < 0.15) Player.vx = 0; }
+  var movement = Game.mods.accel * (ice ? CONFIG.CURSES.subZero.accelMult : 1) * (CONFIG.MOVE_SPEED + Game.blessings.speed * CONFIG.BLESSING_EFFECTS.moveAcceleration) * Math.pow(CONFIG.CURSES.roughEdging.movementMultiplier, Game.curseCount("roughEdging")) * (Weapons.parrySlowTimer > 0 ? CONFIG.KATANA_PARRY_SLOW_MULTIPLIER : 1);
   if (!matrix) { if (Input.left) { Player.vx -= movement; } if (Input.right) { Player.vx += movement; } }
   Player.clampVelocity();
   if (Player.coyoteTimer > 0) Player.coyoteTimer--;
@@ -82,8 +83,10 @@ Player.update = function () {
   for (var i = 0; i < Math.abs(wholeX); i++) { if (Collide.hitsSolid(Player.x + stepX, Player.y, size, size)) { Player.vx = 0; Player.subX = 0; break; } Player.x += stepX; Player.angle += stepX / CONFIG.PLAYER_RADIUS; }
   var stepY = Player.vy > 0 ? 1 : (Player.vy < 0 ? -1 : 0); Player.onGround = false;
   for (var j = 0; j < Math.abs(Player.vy); j++) { if (Collide.hitsSolid(Player.x, Player.y + stepY, size, size)) { if (stepY > 0) { Player.onGround = true; Player.coyoteTimer = CONFIG.COYOTE_TIME_FRAMES; } Player.vy = 0; break; } Player.y += stepY; }
+  if (Player.onGround) Level.tryPad(); // jump pads
   if (Player.x < 0) Player.x = 0;
   Player.clampVelocity();
 };
 Player.isDead = function () { var spikeMargin = Game.levelNumber >= 2 ? CONFIG.LATER_LEVEL_SPIKE_MARGIN : 0; return !Player.isInvincible() && (Player.fakeTesseractHit || Collide.hitsSpike(Player.x + spikeMargin, Player.y + spikeMargin, CONFIG.PLAYER_SIZE - spikeMargin * 2, CONFIG.PLAYER_SIZE - spikeMargin * 2) || Player.y > CONFIG.CANVAS_H + 200); };
-Player.hasWon = function () { return Collide.hitsFinish(Player.x, Player.y, CONFIG.PLAYER_SIZE, CONFIG.PLAYER_SIZE); };
+// You win by touching the beacon of light above the spawn platform (or the Diamond Cuboid, with that curse).
+Player.hasWon = function () { return Level.beaconTouched() || Enemy.diamondTouched(); };

@@ -150,7 +150,7 @@ var CONFIG = {
   // Collapse timing is measured in frames (60 frames = 1 second).
   COLLAPSE_INTERVAL: 150,
   COLLAPSE_WARNING_FRAMES: 180,
-  COLLAPSE_MAP_FRACTION: 0.5,
+  COLLAPSE_MAP_FRACTION: 1,   // was 0.5. 1 = every piece except the spawn piece collapses
 
   PARTICLE_COUNT: 100,
 
@@ -234,3 +234,30 @@ var CONFIG = {
 
   START_LEVEL: 0
 };
+
+
+// =====================================================================
+// CONTENT PASS 3  (beacon, verticality, altars, new curses)
+// =====================================================================
+CONFIG.BEACON = { hover: 110, hitRadius: 44 };   // beacon orb hovers this many px above the spawn platform; touch it to win
+CONFIG.PAD = { minHeight: 120 };                 // jump pads are tuned per pad so they always clear the high platforms
+CONFIG.VERTICAL = { platformChance: 0.75, platformRow: 3, minWidth: 3, maxWidth: 5, padReach: 3 }; // chance per piece of a high platform (+ its jump pad)
+CONFIG.GREATER_CURSE_CHANCE = 0.2;               // chance that one of the 3 curse cards is a Greater curse
+
+CONFIG.ALTAR = {
+  firstLevel: 3,            // 0-based: level 4 is the first with altars
+  maxPerLevel: 2,
+  useRange: 48,             // press F within this many px
+  greedEnemies: 7, greedGoldMult: 2,
+  rewards: { temporary: 10, greater: 25 },  // gold tesseracts for taking a curse from the Altar of Curses
+  chance: { buffWeight: 5, nerfWeight: 3, levelWeight: 2, shieldFrames: 480, goldMin: 4, goldMax: 8, gravityLow: 0.75, gravityHigh: 1.25, collapseFast: 0.6, enemyCalm: 0.75, enemyFrenzy: 1.3 }
+};
+
+CONFIG.CURSES.subZero = { chunks: 3, chunkCols: 5, friction: 0.994, accelMult: 0.3 };            // replaces Rough Edging
+CONFIG.CURSES.adware = { rounds: 3, minFrames: 900, maxFrames: 1700, maxAds: 2, closeDelayMs: 1800, firstDelay: 600 };
+CONFIG.CURSES.diamondCuboid = { rounds: 2, radius: 46, fleeSpeed: 3.2, fleeRange: 380, returnSpeed: 3.6 };
+CONFIG.CURSES.moldyAura = { rounds: 2, chance: 0.012, minSpeed: 1.2, growInterval: 84, budInterval: 420 };
+CONFIG.CURSES.heartbreaker = { startFrames: 900, perTesseract: 240, capFrames: 1200 };           // 15 s, +4 s per tesseract, 20 s cap
+CONFIG.CURSES.ak47 = { damage: 7, speed: 14, life: 70, cooldown: 12, throwDamage: 18, throwSpeed: 15, throwFrames: 22, returnSpeed: 16, knock: 6, abilityCooldown: 150, hitInterval: 8 };
+
+CONFIG.TAR = { radius: 46, cogInterval: 600, cogLife: 620, awakeCogInterval: 300, missesToWake: 2, calmCogs: 3, chaseSpeed: 2.4, chaseGrow: 0.0006, chaseMax: 4.6, maxCogs: 3, cogRange: 30 };

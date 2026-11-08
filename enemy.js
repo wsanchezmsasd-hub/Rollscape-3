@@ -164,7 +164,7 @@ Enemy.applyExtra = function (e, extra) {
 };
 Enemy.makeEnemy = function (type, x, y, radius, hp, respawnFrames, opts) {
   var e = { type: type, x: x, y: y, spawnX: x, spawnY: y, vx: 0, vy: 0, state: "windup", timer: 0, shotTimer: 0, burstShots: 0, fireTimer: 0, radius: radius, angle: 0, targetAngle: 0, hp: hp, maxHp: hp, respawnFrames: respawnFrames, deadTimer: 0, jumpTimer: CONFIG.GREEN_BALL_JUMP_INTERVAL, grounded: false, combined: false, windup: CONFIG.ENEMY_WINDUP_FRAMES,
-    spd: 1, cd: 1, warn: 1, rad: 1, dim: false }; // spd/cd/warn/rad = speed, cooldown, warning-time and blast-radius multipliers (mold versions are nerfed through these)
+    spd: Game.mods.enemySpeed * Game.levelMods.enemySpeed, cd: Game.mods.enemyCooldown, warn: 1, rad: 1, dim: false }; // altars can change the starting spd/cd; spd/cd/warn/rad = speed, cooldown, warning-time and blast-radius multipliers (mold versions are nerfed through these)
   if (opts) for (var k in opts) e[k] = opts[k];
   return e;
 };
@@ -191,10 +191,11 @@ Enemy.update = function () {
   Enemy.sweep();
   if (Game.curseCount("unknownDimension") > 0 && CONFIG.CURSES.unknownDimension.allowCuboidMerge) Enemy.tryCombineCuboids();
   Enemy.updateBullets();
+  Mold.updateOrphan();
 };
 Enemy.updateOne = function (e) {
   switch (e.type) {
-    case "cuboid": if (e.dim) Enemy.updateDimCuboid(e); else Enemy.updateCuboid(e); break;
+    case "cuboid": if (e.diamond) Enemy.updateDiamond(e); else if (e.dim) Enemy.updateDimCuboid(e); else Enemy.updateCuboid(e); break;
     case "drone": if (e.dim) Enemy.updateDimDrone(e); else Enemy.updateDrone(e); break;
     case "drill": Enemy.updateDrill(e); break;
     case "greenBall4": Enemy.updateGreenBall(e); break;
@@ -218,6 +219,7 @@ Enemy.growStep = function (e) {
 };
 Enemy.kill = function (e) {
   e.hp = Math.min(e.hp, 0);
+  Draw.burst(e.x, e.y, e.moldVariant || e.moldRoller || e.type === "mold" ? "#2ecc5a" : (e.dim ? "#ff9f1c" : "#c77dff"), 14);
   if (e.noRespawn || !(e.respawnFrames > 0)) e.remove = true; else e.deadTimer = e.respawnFrames;
 };
 Enemy.respawn = function (e) {
@@ -229,7 +231,7 @@ Enemy.respawn = function (e) {
 };
 // A respawned enemy must not remember what it was doing when it died.
 Enemy.clearState = function (e) {
-  ["aseState", "aseTimer", "destX", "destY", "aseWarnTotal", "offsetX", "offsetY", "dashCount", "doubleDashUsed", "laser", "laserCd", "rState", "rTimer", "targets", "leapState", "leapTimer", "slamsLeft", "moldTimer", "growTimer", "budTimer"].forEach(function (key) { delete e[key]; });
+  ["aseState", "aseTimer", "destX", "destY", "aseWarnTotal", "offsetX", "offsetY", "dashCount", "doubleDashUsed", "laser", "laserCd", "rState", "rTimer", "targets", "leapState", "leapTimer", "slamsLeft", "ghost", "floorY", "landY", "moldTimer", "growTimer", "budTimer"].forEach(function (key) { delete e[key]; });
   e.burstShots = 0; e.aimTimer = 0; e.shotTimer = 0; e.fireTimer = 0;
 };
 
@@ -242,20 +244,69 @@ Enemy.dominoStartCrouch = function (e, frames) {
   // Slam Dunk: no random landing offset -- it aims straight at you.
   e.leapOffset = Game.hasCurse("slamDunk") ? 0 : (Math.random() * 2 - 1) * CONFIG.DOMINO_LEAP_RANGE;
 };
+// ---- Where does the slab come down?
+// If you are standing on something, it lands on that surface (or the first surface below the spot it aimed for), passing straight
+// through any walls in between. If you are in the air, it ignores platforms and falls all the way to the bottom.
+Enemy.dominoFootprintSolid = function (x, row) {
+  var T = CONFIG.TILE, halfW = CONFIG.DOMINO_WIDTH / 2;
+  for (var c = Math.floor((x - halfW) / T); c <= Math.floor((x + halfW - 1) / T); c++) if (Level.isSolid(c, row)) return true;
+  return false;
+};
+Enemy.dominoSurfaceAt = function (x) {
+  var T = CONFIG.TILE, r;
+  if (Player.onGround || Player.coyoteTimer > 0) {
+    for (r = Math.max(0, Math.floor((Player.y + CONFIG.PLAYER_SIZE) / T)); r < CONFIG.ROWS; r++) if (Enemy.dominoFootprintSolid(x, r)) return r * T;
+    return null;
+  }
+  for (r = CONFIG.ROWS - 1; r >= 0; r--) if (Enemy.dominoFootprintSolid(x, r) && (r === 0 || !Enemy.dominoFootprintSolid(x, r - 1))) return r * T;
+  return null;
+};
+// Nearest x (to the wanted one) that has something to land on. Returns { x, y } where y is the surface the slab's bottom touches.
+Enemy.dominoFindLanding = function (wantX) {
+  var halfW = CONFIG.DOMINO_WIDTH / 2, W = Level.pixelWidth(), x = Enemy.clamp(wantX, halfW, W - halfW);
+  for (var step = 0; step <= W; step += CONFIG.TILE / 2) {
+    for (var side = 0; side < 2; side++) {
+      var cx = x + (side ? -step : step);
+      if (cx >= halfW && cx <= W - halfW) { var y = Enemy.dominoSurfaceAt(cx); if (y !== null) return { x: cx, y: y }; }
+      if (step === 0) break;
+    }
+  }
+  return { x: x, y: CONFIG.CANVAS_H + 400 };
+};
+// How many frames the leap takes (simulated, so the MAX_FALL clamp is respected) -- used to aim the horizontal speed.
+Enemy.dominoAirFrames = function (bottomY, landY, jumpSpeed) {
+  var vy = -jumpSpeed, y = bottomY, n = 0;
+  while (n < 600) { vy += CONFIG.GRAVITY; if (vy > CONFIG.MAX_FALL) vy = CONFIG.MAX_FALL; y += vy; n++; if (vy > 0 && y >= landY) break; }
+  return Math.max(1, n);
+};
+// In the air the slab ignores terrain completely and lands on e.landY.
+Enemy.dominoFly = function (e, halfW, halfH) {
+  e.vy += CONFIG.GRAVITY; if (e.vy > CONFIG.MAX_FALL) e.vy = CONFIG.MAX_FALL;
+  e.x = Enemy.clamp(e.x + e.vx, halfW, Level.pixelWidth() - halfW); e.y += e.vy; e.grounded = false;
+  if (e.vy > 0 && e.y + halfH >= e.landY) {
+    e.y = e.landY - halfH; e.floorY = e.landY; e.vy = 0;
+    e.ghost = Collide.hitsSolid(e.x - halfW, e.y - halfH, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT - 1); // came down inside terrain: stand there without solid collision
+    Enemy.dominoLand(e);
+  }
+};
 Enemy.updateDomino = function (e) {
   if (e.leapState === undefined) { e.leapState = "grounded"; e.leapTimer = Enemy.dominoPause(e); e.squash = 0; e.slamsLeft = 0; }
   var halfW = CONFIG.DOMINO_WIDTH / 2, halfH = CONFIG.DOMINO_HEIGHT / 2;
-  e.vy += CONFIG.GRAVITY;
-  if (e.vy > CONFIG.MAX_FALL) e.vy = CONFIG.MAX_FALL;
-  var nextY = e.y + e.vy;
-  if (Collide.hitsSolid(e.x - halfW, nextY - halfH, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT)) {
-    if (e.vy > 0) { e.y = Math.floor((nextY + halfH) / CONFIG.TILE) * CONFIG.TILE - halfH; if (e.leapState === "airborne") Enemy.dominoLand(e); }
-    else if (e.vy < 0) { e.y = (Math.floor((nextY - halfH) / CONFIG.TILE) + 1) * CONFIG.TILE + halfH; }
-    e.vy = 0;
-  } else { e.y = nextY; }
-  if (!Collide.hitsSolid(e.x - halfW + e.vx, e.y - halfH, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT)) e.x += e.vx; else e.vx = 0;
-  // Probe 1px below so "grounded" is steady (resting gravity otherwise flickers it every other frame).
-  e.grounded = Collide.hitsSolid(e.x - halfW, e.y - halfH + 1, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT);
+  if (e.leapState === "airborne") Enemy.dominoFly(e, halfW, halfH);
+  else if (e.ghost) { e.vx = 0; e.vy = 0; e.y = e.floorY - halfH; e.grounded = true; }
+  else {
+    e.vy += CONFIG.GRAVITY;
+    if (e.vy > CONFIG.MAX_FALL) e.vy = CONFIG.MAX_FALL;
+    var nextY = e.y + e.vy;
+    if (Collide.hitsSolid(e.x - halfW, nextY - halfH, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT)) {
+      if (e.vy > 0) e.y = Math.floor((nextY + halfH) / CONFIG.TILE) * CONFIG.TILE - halfH;
+      else if (e.vy < 0) e.y = (Math.floor((nextY - halfH) / CONFIG.TILE) + 1) * CONFIG.TILE + halfH;
+      e.vy = 0;
+    } else { e.y = nextY; }
+    if (!Collide.hitsSolid(e.x - halfW + e.vx, e.y - halfH, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT)) e.x += e.vx; else e.vx = 0;
+    // Probe 1px below so "grounded" is steady (resting gravity otherwise flickers it every other frame).
+    e.grounded = Collide.hitsSolid(e.x - halfW, e.y - halfH + 1, CONFIG.DOMINO_WIDTH, CONFIG.DOMINO_HEIGHT);
+  }
 
   if (e.leapState === "grounded") {
     e.squash *= 0.8; e.angle *= 0.8;
@@ -265,13 +316,14 @@ Enemy.updateDomino = function (e) {
     }
   } else if (e.leapState === "crouch") {
     e.squash = 1 - e.leapTimer / e.crouchTotal; e.leapTimer--;
-    // The landing spot follows you during the crouch (shown as a dashed line), then locks when it leaps.
-    e.targetX = Math.max(halfW, Math.min(Level.pixelWidth() - halfW, Enemy.pcx() + (e.leapOffset || 0)));
+    // The landing spot follows you during the crouch (dashed line + ring on the surface it will hit), then locks when it leaps.
+    var land = Enemy.dominoFindLanding(Enemy.pcx() + (e.leapOffset || 0));
+    e.targetX = land.x; e.landY = land.y;
     if (e.leapTimer <= 0) {
       // Launch speed derived from the desired apex so DOMINO_JUMP_HEIGHT actually means "high".
       var jumpSpeed = Math.sqrt(2 * CONFIG.GRAVITY * CONFIG.DOMINO_JUMP_HEIGHT);
-      var airFrames = Math.max(1, Math.round(2 * jumpSpeed / CONFIG.GRAVITY));
-      e.vx = (e.targetX - e.x) / airFrames; e.vy = -jumpSpeed; e.grounded = false; e.leapState = "airborne"; e.squash = 0;
+      var airFrames = Enemy.dominoAirFrames(e.y + halfH, e.landY, jumpSpeed);
+      e.vx = (e.targetX - e.x) / airFrames; e.vy = -jumpSpeed; e.grounded = false; e.ghost = false; e.leapState = "airborne"; e.squash = 0;
     }
   } else if (e.leapState === "airborne") {
     e.angle = Math.atan2(e.vy, e.vx) * 0.25;
@@ -280,6 +332,7 @@ Enemy.updateDomino = function (e) {
       var sd = CONFIG.CURSES.slamDunk, aim = Enemy.clamp(Enemy.pcx(), halfW, Level.pixelWidth() - halfW);
       e.vx = Enemy.clamp(e.vx + Enemy.clamp((aim - e.x) * 0.01 - e.vx * 0.06, -sd.steer, sd.steer), -sd.maxAirSpeed, sd.maxAirSpeed);
       e.targetX = aim;
+      var under = Enemy.dominoSurfaceAt(e.x); if (under !== null) e.landY = under;
     }
   } else if (e.leapState === "landed") {
     e.squash = e.leapTimer / CONFIG.DOMINO_SHOCKWAVE_LIFE; e.leapTimer--;
@@ -328,7 +381,7 @@ Enemy.dominoOverlapsCircle = function (e, x, y, r) {
 // ---------------------------------------------------------------- Cuboid
 // Unknown Dimension curse: the original pair of cuboids can merge. (Dimensional cuboids, clones and mold cuboids never merge this way.)
 Enemy.tryCombineCuboids = function () {
-  var cuboids = Enemy.enemies.filter(function (e) { return e.type === "cuboid" && !e.combined && !e.dim && !e.moldVariant && !e.rift && !e.remove; });
+  var cuboids = Enemy.enemies.filter(function (e) { return e.type === "cuboid" && !e.combined && !e.dim && !e.moldVariant && !e.rift && !e.diamond && !e.remove; });
   if (cuboids.length < CONFIG.CUOBID_GROUP_SIZE) return;
   var cx = 0, cy = 0;
   cuboids.forEach(function (e) { cx += e.x; cy += e.y; });
@@ -538,7 +591,7 @@ Enemy.updateBullets = function () {
 };
 
 // ---------------------------------------------------------------- damage
-Enemy.wear = function () { return Math.pow(CONFIG.CURSES.wearAndTear.damageMultiplier, Game.curseCount("wearAndTear")); };
+Enemy.wear = function () { return Math.pow(CONFIG.CURSES.wearAndTear.damageMultiplier, Game.curseCount("wearAndTear")) * Game.mods.damage; };
 Enemy.damageAt = function (x, y, damage, reach) {
   for (var i = 0; i < Enemy.enemies.length; i++) {
     var e = Enemy.enemies[i]; if (e.deadTimer > 0 || e.dormant || e.remove || e.noHit) continue;

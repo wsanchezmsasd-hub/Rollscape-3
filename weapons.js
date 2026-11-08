@@ -43,6 +43,7 @@ Weapons.update = function () {
   }
 };
 Weapons.fire = function () {
+  if (Features.akActive()) { Features.akFire(); return; } // AK-47 curse replaces your weapon
   var stats = CONFIG.CLASS_STATS[Player.classType];
   if (!stats || Weapons.reloadTimer > 0 || Weapons.fireCooldown > 0) return;
   if (Player.classType === "tomahawk") {
@@ -73,6 +74,7 @@ Weapons.fire = function () {
   if (Player.classType === "bazooka") Weapons.fireCooldown = CONFIG.BAZOOKA_FIRE_COOLDOWN;
 };
 Weapons.useAbility = function () {
+  if (Features.akActive()) { Features.akAbility(); return; } // ...and your ability
   if (Player.classType === "tomahawk") {
     if (Weapons.abilityCooldown > 0) return;
     for (var spread = -1; spread <= 1; spread++) Weapons.throwTomahawk(Input.mouseX, Input.mouseY, spread * CONFIG.TOMAHAWK_VOLLEY_SPREAD);
@@ -161,4 +163,5 @@ Weapons.explode = function (x, y) {
   Level.destroyCircle(x, y, CONFIG.BAZOOKA_BLAST_RADIUS);
   Enemy.damageRadius(x, y, CONFIG.BAZOOKA_BLAST_RADIUS, CONFIG.CLASS_STATS.bazooka.damage);
   Weapons.explosions.push({ x: x, y: y, age: 0 });
+  Draw.burst(x, y, "#c77dff", 22); Draw.addShake(5);
 };

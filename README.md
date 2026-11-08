@@ -4,7 +4,7 @@
 
 Welcome to your eternal prison.
 You (the ball) have been brought down to ROLLSCAPE as punishment for *countless* war crimes against others using weaponry in previous ROLLER games.
-You will be figHting  for survival in an EndLess geometric Plane. Choose from **4 distinct classes** to manipulate the arena, build momentum, and reach the finish after collecting all RED tessaracts. Use your heavy weapons arsenal to blow back the onslaught—they might fall for a moment, but they *always* respawn.
+You will be figHting  for survival in an EndLess geometric Plane. Choose from **4 distinct classes** to manipulate the arena, build momentum, and reach the beacon of light after collecting all RED tessaracts. Use your heavy weapons arsenal to blow back the onslaught—they might fall for a moment, but they *always* respawn.
 
 ---
 
@@ -45,3 +45,9 @@ Every enemy has a superbuffed **Dimensional** version (orange aura). It shows up
 *   **Matrix Tesseract** (20 gold) — flat movement speed, no momentum. Knockback still applies.
 *   **Jet Boots** (30 gold) — hold jump in the air to fly up for 0.5s; refuels in 2s on the ground.
 
+
+### Altars (level 4+)
+Walk up to a short pillar and press **F**. *Chance* (random buff / nerf / level change), *Duality* (pick a buff + nerf pair), *Greed* (double gold, many enemies), *Curses* (a temporary or Greater curse for gold). Jump pads (mint) throw you up to high platforms with tesseracts.
+
+### Curse kinds
+Permanent, **Temporary** (lasts N levels), **Greater** (rare, permanent). New: Sub-Zero, Adware, Diamond Cuboid, Moldy Aura, Heartbreaker, AK-47, Tar. See CHANGES.md.

@@ -49,53 +49,7 @@ Draw.drawParticles = function () {
   ctx.restore();
 };
 
-Draw.everything = function () {
-  var ctx = Draw.ctx;
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
-  if (Game.mode !== "command") Draw.updateParticles();
-  Draw.drawParticles();
-  ctx.save();
-  ctx.translate(-Draw.cameraX, 0);
-  Draw.world();
-  Draw.rightWall();
-  Draw.mold();
-  Draw.dominoEffects();
-  Draw.portals();
-  Draw.enemies();
-  Draw.lasers();
-  Draw.explosions();
-  Draw.projectiles();
-  Draw.player();
-  ctx.restore();
-  Draw.hud();
-};
 
-Draw.world = function () {
-  var size = CONFIG.TILE, firstCol = Math.floor(Draw.cameraX / size) - 1, lastCol = firstCol + Math.ceil(CONFIG.CANVAS_W / size) + 2, ctx = Draw.ctx;
-  var warning = Level.collapseWarning > 0, warningCols = warning ? Level.collapseColumns : null;
-  for (var row = 0; row < CONFIG.ROWS; row++) for (var col = firstCol; col <= lastCol; col++) {
-    var here = Level.charAt(col, row), x = col * size, y = row * size;
-    var atRisk = warning && warningCols.indexOf(col) >= 0;
-    if (here === "#") { if (atRisk) Draw.blockWarning(x, y, size); else Draw.block(x, y, size); }
-    if (here === "^") { if (atRisk) Draw.spikeWarning(x, y, size); else Draw.spike(x, y, size); }
-    if (here === "F" && Level.goldActive) Draw.finish(x, y, size);
-  }
-  if (warning && warningCols.length) {
-    var spanStart = Math.min.apply(null, warningCols) * size, spanEnd = (Math.max.apply(null, warningCols) + 1) * size;
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 3;
-    ctx.setLineDash([10, 8]);
-    ctx.beginPath(); ctx.moveTo(spanStart, 0); ctx.lineTo(spanStart, CONFIG.CANVAS_H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(spanEnd, 0); ctx.lineTo(spanEnd, CONFIG.CANVAS_H); ctx.stroke();
-    ctx.restore();
-  }
-  Level.redTesseracts.forEach(function (tesseract) { if (!tesseract.collected) Draw.tesseract(tesseract.x, tesseract.y, "#c724ff"); });
-  if (Level.goldActive) Level.goldTesseracts.forEach(function (tesseract) { if (!tesseract.collected) Draw.tesseract(tesseract.x, tesseract.y, "#e0b3ff"); });
-  Level.fakeTesseracts.forEach(function (tesseract) { Draw.fakeTesseract(tesseract.x, tesseract.y); });
-};
 Draw.dominoEffects = function () {
   var ctx = Draw.ctx;
   Enemy.enemies.forEach(function (e) {
@@ -132,12 +86,6 @@ Draw.fakeTesseract = function (x, y) {
   for (var i = 0; i < 5; i++) { var angle = -Math.PI / 2 + i * Math.PI * 2 / 5; if (i === 0) ctx.moveTo(Math.cos(angle) * 12, Math.sin(angle) * 12); else ctx.lineTo(Math.cos(angle) * 12, Math.sin(angle) * 12); }
   ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
 };
-Draw.tesseract = function (x, y, color) { var ctx = Draw.ctx; ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.fillStyle = color; ctx.fillRect(-9, -9, 18, 18); ctx.fillStyle = "#1a0033"; ctx.fillRect(-4, -4, 8, 8); ctx.restore(); };
-Draw.block = function (x, y, size) { var ctx = Draw.ctx; ctx.fillStyle = "#9d3fff"; ctx.fillRect(x, y, size, size); ctx.strokeStyle = "#9d3fff"; ctx.lineWidth = CONFIG.LINE_WIDTH; ctx.strokeRect(x, y, size, size); };
-Draw.blockWarning = function (x, y, size) { var ctx = Draw.ctx; ctx.fillStyle = "#ffffff"; ctx.fillRect(x, y, size, size); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = CONFIG.LINE_WIDTH; ctx.strokeRect(x, y, size, size); };
-Draw.spike = function (x, y, size) { var ctx = Draw.ctx; ctx.fillStyle = "#9d3fff"; ctx.beginPath(); ctx.moveTo(x, y + size); ctx.lineTo(x + size / 2, y); ctx.lineTo(x + size, y + size); ctx.closePath(); ctx.fill(); };
-Draw.spikeWarning = function (x, y, size) { var ctx = Draw.ctx; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.moveTo(x, y + size); ctx.lineTo(x + size / 2, y); ctx.lineTo(x + size, y + size); ctx.closePath(); ctx.fill(); };
-Draw.finish = function (x, y, size) { var ctx = Draw.ctx; ctx.fillStyle = "#9d3fff"; ctx.fillRect(x + size / 2 - 2, y, 4, size); ctx.beginPath(); ctx.moveTo(x + size / 2 + 2, y + 4); ctx.lineTo(x + size - 4, y + 12); ctx.lineTo(x + size / 2 + 2, y + 20); ctx.closePath(); ctx.fill(); };
 // ===================================================================
 // ENEMIES. Everything about how enemies look lives below.
 // Palette: normal = purple, mold = greens, Dimensional = orange aura on top.
@@ -157,27 +105,6 @@ Draw.dimAura = function (x, y, r) {
   ctx.fillStyle = "#ffb347"; ctx.globalAlpha = 0.9;
   for (var k = 0; k < 3; k++) { var a = t / 600 + k * Math.PI * 2 / 3; ctx.save(); ctx.translate(Math.cos(a) * (r + 10), Math.sin(a) * (r + 10)); ctx.rotate(Math.PI / 4); ctx.fillRect(-3, -3, 6, 6); ctx.restore(); }
   ctx.restore();
-};
-Draw.enemies = function () {
-  var ctx = Draw.ctx;
-  for (var i = 0; i < Enemy.enemies.length; i++) {
-    var e = Enemy.enemies[i];
-    if (e.deadTimer > 0 || e.remove) continue;
-    if (e.state === "windup" && e.type !== "roller") Draw.windup(e);
-    switch (e.type) {
-      case "cuboid": Draw.cuboid(e); break;
-      case "drone": Draw.drone(e); break;
-      case "drill": Draw.drill(e); break;
-      case "domino": Draw.domino(e); break;
-      case "greenBall4": Draw.greenBall(e); break;
-      case "ase": Draw.ase(e); break;
-      case "roller": Draw.roller(e); break;
-      case "rocket": Draw.rocketLauncher(e); break;
-      case "mold": Draw.moldCore(e); break;
-      case "moldPlant": Draw.moldPlant(e); break;
-    }
-  }
-  Draw.enemyBullets();
 };
 Draw.cuboid = function (e) {
   var ctx = Draw.ctx, r = e.radius, mold = e.moldVariant;
@@ -403,31 +330,12 @@ Draw.abilityStatus = function () {
   else return null; // bazooka has no ability
   return frames > 0 ? (frames / 60).toFixed(1) + "s" : "READY";
 };
-Draw.hud = function () {
-  var ctx = Draw.ctx; if (!Player.classType) return;
-  var stats = CONFIG.CLASS_STATS[Player.classType], redLeft = Level.redTesseracts.filter(function (tesseract) { return !tesseract.collected; }).length;
-  ctx.font = "14px monospace"; ctx.textAlign = "left";
-  ctx.fillStyle = "#ffffff"; ctx.fillText(Player.classType.toUpperCase() + "  " + Weapons.ammo + "/" + (stats.ammo + Game.blessings.ammo * CONFIG.BLESSING_EFFECTS.ammoBonus) + (Weapons.reloadTimer > 0 ? "  RELOADING" : ""), 12, 20);
-  ctx.fillStyle = "#c724ff"; ctx.fillText("RED " + redLeft, 12, 38);
-  ctx.fillStyle = "#e0b3ff"; ctx.fillText("GOLD " + Game.goldTesseracts, 12, 56);
-  var ability = Draw.abilityStatus();
-  if (ability) { ctx.fillStyle = ability === "READY" ? "#66eaff" : "#c77dff"; ctx.fillText("E  " + ability, 12, 74); }
-  var hudY = ability ? 92 : 74;
-  if (Game.upgrades.jets) { ctx.fillStyle = "#ffb347"; ctx.fillText("JET", 12, hudY); ctx.strokeStyle = "#ffb347"; ctx.strokeRect(46, hudY - 10, 62, 10); ctx.fillStyle = Player.jetFuel >= CONFIG.JET.fuelFrames ? "#66eaff" : "#ffb347"; ctx.fillRect(47, hudY - 9, 60 * Math.max(0, Player.jetFuel) / CONFIG.JET.fuelFrames, 8); hudY += 18; }
-  if (Game.upgrades.matrix) { ctx.fillStyle = "#ffb347"; ctx.fillText("MATRIX", 12, hudY); hudY += 18; }
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#ffffff"; ctx.fillText(Level.name, CONFIG.CANVAS_W - 12, 20);
-  ctx.fillStyle = "#ff6fd8";
-  Game.curseSummary().forEach(function (curse, i) { ctx.fillText(curse.name + (curse.count > 1 ? " x" + curse.count : ""), CONFIG.CANVAS_W - 12, 38 + i * 18); });
-  ctx.textAlign = "left";
-};
 Draw.jetFlame = function () {
   if (!Player.jetting) return;
   var ctx = Draw.ctx, cx = Player.x + CONFIG.PLAYER_SIZE / 2, by = Player.y + CONFIG.PLAYER_SIZE, flick = 10 + Math.random() * 10;
   ctx.save(); ctx.fillStyle = "#ff9f1c"; ctx.beginPath(); ctx.moveTo(cx - 7, by - 2); ctx.lineTo(cx + 7, by - 2); ctx.lineTo(cx, by + flick); ctx.closePath(); ctx.fill();
   ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(cx - 3, by - 2); ctx.lineTo(cx + 3, by - 2); ctx.lineTo(cx, by + flick * 0.5); ctx.closePath(); ctx.fill(); ctx.restore();
 };
-Draw.player = function () { Draw.jetFlame(); var ctx = Draw.ctx, r = CONFIG.PLAYER_RADIUS, centerX = Player.x + CONFIG.PLAYER_SIZE / 2, centerY = Player.y + CONFIG.PLAYER_SIZE / 2; ctx.fillStyle = "#000000"; ctx.strokeStyle = Player.invincibilityTimer > 0 ? "#66eaff" : "#c77dff"; ctx.lineWidth = CONFIG.LINE_WIDTH; ctx.beginPath(); ctx.arc(centerX, centerY, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); var dotX = centerX + Math.cos(Player.angle) * r * CONFIG.DOT_DISTANCE, dotY = centerY + Math.sin(Player.angle) * r * CONFIG.DOT_DISTANCE; ctx.fillStyle = "#c77dff"; ctx.beginPath(); ctx.arc(dotX, dotY, 4, 0, Math.PI * 2); ctx.fill(); };
 Draw.rightWall = function () {
   var size = CONFIG.TILE, x = Level.cols * size;
   if (x < Draw.cameraX - size || x > Draw.cameraX + CONFIG.CANVAS_W + size) return;

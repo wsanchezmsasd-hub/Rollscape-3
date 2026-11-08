@@ -9,6 +9,7 @@
 Enemy.addExplosion = function (x, y, r, opts) {
   opts = opts || {};
   Enemy.explosions.push({ x: x, y: y, r: r, age: 0, life: opts.life || 22, lethal: opts.lethal == null ? 6 : opts.lethal, dim: !!opts.dim, mold: !!opts.mold });
+  if (typeof Draw !== "undefined" && Draw.burst) { Draw.burst(x, y, opts.mold ? "#2ecc5a" : (opts.dim ? "#ff9f1c" : "#ff2fd0"), Math.min(26, Math.round(r / 5))); Draw.addShake(Math.min(6, r / 25)); }
 };
 Enemy.updateExplosions = function () {
   for (var i = Enemy.explosions.length - 1; i >= 0; i--) {

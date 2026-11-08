@@ -28,11 +28,13 @@ Level.build = function (levelNumber) {
   for (var p = 0; p < level.pieces.length; p++) {
     var piece = Level.pieces[level.pieces[p]];
     if (!piece) { console.error("No piece named '" + level.pieces[p] + "' in pieces.json"); piece = Level.pieces.flat; }
-    if (Level.pieceHasStartOrFinish(level.pieces[p])) Level.protectedPieceIndices.push(p);
-    for (var r = 0; r < CONFIG.ROWS; r++) { Level.grid[r] += piece[r]; }
+    if (Level.pieceHasStart(level.pieces[p])) Level.protectedPieceIndices.push(p); // only the spawn piece survives the collapse
+    for (var r = 0; r < CONFIG.ROWS; r++) { Level.grid[r] += piece[r].replace(/F/g, "."); } // the old Finish flag is gone: the beacon replaces it
   }
   Level.buildCollapseOrder(level.pieces.length);
   Level.findStart();
+  Level.iceBuilt = false; Level.iceCols = {};
+  Level.computeBeacon(); Level.addVertical(); Level.addAltars(levelNumber); Level.ensureIce(); // features.js
   Level.placeTesseracts(level.pieces);
 };
 
@@ -88,7 +90,7 @@ Level.placeTesseracts = function (pieceNames) {
     if (!spots) return;
     spots.forEach(function (spot) { authored.push({ x: (pieceIndex * CONFIG.PIECE_COLS + spot[0]) * CONFIG.TILE + CONFIG.TILE / 2, y: spot[1] * CONFIG.TILE + CONFIG.TILE / 2 }); });
   });
-  var selected = authored; // use however many the level actually has
+  var selected = (Level.extraSpots || []).concat(authored); // high-platform tesseracts first, so some of them are gold
   if (!selected.length) { // safety net: a level with zero authored tesseracts would be instantly "complete"
     var candidates = [];
     for (var col2 = 2; col2 < Level.cols - 2; col2++) for (var row2 = 1; row2 < CONFIG.ROWS - 1; row2++) {
@@ -138,11 +140,11 @@ Level.updateTesseracts = function () {
   Player.fakeTesseractHit = Level.fakeTesseracts.some(function (tesseract) { return Math.hypot(playerX - tesseract.x, playerY - tesseract.y) < CONFIG.FIVE_CUBE_KILL_RADIUS; });
   var collectionRange = CONFIG.TESSERACT_COLLECTION_RANGE + Game.blessings.magnet * CONFIG.TESSERACT_MAGNET_BONUS;
   Level.redTesseracts.forEach(function (tesseract) {
-    if (!tesseract.collected && Math.hypot(playerX - tesseract.x, playerY - tesseract.y) < collectionRange) tesseract.collected = true;
+    if (!tesseract.collected && Math.hypot(playerX - tesseract.x, playerY - tesseract.y) < collectionRange) { tesseract.collected = true; Features.onCollect(); }
   });
   if (!Level.goldActive && Level.redTesseracts.every(function (tesseract) { return tesseract.collected; })) { Level.goldActive = true; Level.collapseActive = true; Level.collapseTimer = Game.hasCurse("unstablePlain") ? CONFIG.CURSES.unstablePlain.firstDelayFrames : CONFIG.COLLAPSE_INTERVAL; }
   if (Level.goldActive) Level.goldTesseracts.forEach(function (tesseract) {
-    if (!tesseract.collected && Math.hypot(playerX - tesseract.x, playerY - tesseract.y) < collectionRange) { tesseract.collected = true; Game.goldTesseracts += Math.pow(CONFIG.CURSES.unstablePlain.goldMultiplier, Game.curseCount("unstablePlain")); }
+    if (!tesseract.collected && Math.hypot(playerX - tesseract.x, playerY - tesseract.y) < collectionRange) { tesseract.collected = true; Game.goldTesseracts += Features.goldValue(); Features.onCollect(); }
   });
 };
 
@@ -155,7 +157,7 @@ Level.updateCollapse = function () {
   else Level.bigCollapse();
 };
 Level.legacyCollapse = function () {
-  Level.collapseTimer = CONFIG.CURSES.unstablePlain.collapseFrames;
+  Level.collapseTimer = Math.max(10, Math.round(CONFIG.CURSES.unstablePlain.collapseFrames * Features.collapseMult()));
   Level.collapseColumns = Level.nextCollapseColumns();
   if (!Level.collapseColumns.length) { Level.collapseActive = false; return; }
   Level.collapseColumn = Level.collapseColumns[0];
@@ -163,7 +165,7 @@ Level.legacyCollapse = function () {
   Level.collapseStarted();
 };
 Level.bigCollapse = function () {
-  Level.collapseTimer = CONFIG.COLLAPSE_INTERVAL;
+  Level.collapseTimer = Math.round(CONFIG.COLLAPSE_INTERVAL * Features.collapseMult());
   Level.collapseColumns = Level.nextCollapseColumns();
   if (!Level.collapseColumns.length) { Level.collapseActive = false; return; }
   Level.collapseColumn = Level.collapseColumns[0];
@@ -233,7 +235,7 @@ Level.charAt = function (col, row) { if (row < 0 || row >= CONFIG.ROWS || col < 
 Level.isSolid = function (col, row) { if (col >= Level.cols) return true; /* right-hand wall */ return Level.charAt(col, row) === "#"; };
 Level.isSpawnColumn = function (col) { return Level.protectedPieceIndices.indexOf(Math.floor(col / CONFIG.PIECE_COLS)) >= 0; };
 Level.isSpike = function (col, row) { return Level.charAt(col, row) === "^"; };
-Level.isFinish = function (col, row) { return Level.goldActive && Level.charAt(col, row) === "F"; };
+Level.isFinish = function () { return false; }; // the finish is the beacon now (see features.js)
 Level.destroyCircle = function (x, y, radius) {
   var firstCol = Math.floor((x - radius) / CONFIG.TILE), lastCol = Math.floor((x + radius) / CONFIG.TILE);
   var firstRow = Math.floor((y - radius) / CONFIG.TILE), lastRow = Math.floor((y + radius) / CONFIG.TILE);
