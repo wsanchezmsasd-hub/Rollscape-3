@@ -241,7 +241,7 @@ var CONFIG = {
 // =====================================================================
 CONFIG.BEACON = { hover: 110, hitRadius: 44 };   // beacon orb hovers this many px above the spawn platform; touch it to win
 CONFIG.PAD = { maxSpeed: 40, margin: 110 };      // jump pads are 2-tile mini-platforms; each is tuned to throw you `margin` px above its platform. maxSpeed lifts the normal fall/rise cap during a launch
-CONFIG.VERTICAL = { platformChance: 0.75, lowestRow: -5, highestRow: -7, minWidth: 3, maxWidth: 5, padReach: 2 }; // platform rows are ABOVE the screen top (ground is row 8): -7 = 600px up, -12 = 800px up // chance per piece of a high platform (+ its jump pad)
+CONFIG.VERTICAL = { platformChance: 0.75, lowestRow: 1, highestRow: -2, minWidth: 3, maxWidth: 5, padReach: 2 }; // platform rows are ABOVE the screen top (ground is row 8): -7 = 600px up, -12 = 800px up // chance per piece of a high platform (+ its jump pad)
 CONFIG.GREATER_CURSE_CHANCE = 0.2;               // chance that one of the 3 curse cards is a Greater curse
 CONFIG.GREATER_REQUIRED_LEVEL = 4;               // 0-based: the curse choice before level 5 offers ONLY Greater curses (you must take one)
 //               // chance that one of the 3 curse cards is a Greater curse
@@ -250,8 +250,8 @@ CONFIG.ALTAR = {
   firstLevel: 3,            // 0-based: level 4 is the first with altars
   maxPerLevel: 2,
   useRange: 48,             // press F within this many px
-  greedEnemies: 7, greedGoldMult: 2,
-  rewards: { temporary: 10, greater: 40 },  // gold tesseracts for taking a curse from the Altar of Curses
+  greedEnemies: 5, greedGoldMult: 3,
+  rewards: { temporary: 15, greater: 35 },  // gold tesseracts for taking a curse from the Altar of Curses
   chance: { buffWeight: 5, nerfWeight: 3, levelWeight: 2, shieldFrames: 480, goldMin: 4, goldMax: 8, gravityLow: 0.75, gravityHigh: 1.25, collapseFast: 0.6, enemyCalm: 0.75, enemyFrenzy: 1.3 }
 };
 
