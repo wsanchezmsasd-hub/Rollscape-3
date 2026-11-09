@@ -2,16 +2,20 @@
    player.js  --  THE ROLLING CIRCLE.
    ===================================================================== */
 var Player = { x: 0, y: 0, vx: 0, vy: 0, onGround: false, coyoteTimer: 0, angle: 0, classType: null, dashTimer: 0, dashCooldown: 0, invincibilityTimer: 0 };
-Player.reset = function () { Player.x = Level.startX; Player.y = Level.startY; Player.vx = 0; Player.vy = 0; Player.onGround = false; Player.coyoteTimer = 0; Player.angle = 0; Player.dashTimer = 0; Player.dashCooldown = 0; Player.invincibilityTimer = 0; Player.fakeTesseractHit = false; Player.subX = 0; Player.effVx = 0; Player.jetFuel = CONFIG.JET.fuelFrames; Player.jetting = false; };
+Player.reset = function () { Player.x = Level.startX; Player.y = Level.startY; Player.vx = 0; Player.vy = 0; Player.onGround = false; Player.coyoteTimer = 0; Player.angle = 0; Player.dashTimer = 0; Player.dashCooldown = 0; Player.invincibilityTimer = 0; Player.fakeTesseractHit = false; Player.subX = 0; Player.effVx = 0; Player.jetFuel = CONFIG.JET.fuelFrames; Player.jetting = false; Player.padLaunch = false; };
 // Dashing (pistols) and parry/hit invincibility both count. Enemy attacks of every kind check this.
 Player.isInvincible = function () { return Player.dashTimer > 0 || Player.invincibilityTimer > 0; };
 // Matrix Tesseract: your own flat horizontal speed. Rough Edging and Quick Roll scale it like they scale acceleration.
 Player.matrixSpeed = function () { return CONFIG.MATRIX_SPEED * (1 + Game.blessings.speed * CONFIG.BLESSING_EFFECTS.moveAcceleration / CONFIG.MOVE_SPEED) * Math.pow(CONFIG.CURSES.roughEdging.movementMultiplier, Game.curseCount("roughEdging")) * (Weapons.parrySlowTimer > 0 ? CONFIG.KATANA_PARRY_SLOW_MULTIPLIER : 1); };
+// Walking off one edge of the level puts you on the other.
+Player.wrap = function () { var W = Level.pixelWidth(), cx = Player.x + CONFIG.PLAYER_SIZE / 2; if (W <= 0) return; if (cx < 0) Player.x += W; else if (cx >= W) Player.x -= W; };
 Player.clampVelocity = function () {
+  if (Player.padLaunch && Player.vy > -CONFIG.MAX_VERTICAL_SPEED) Player.padLaunch = false; // launch is over once you have slowed to normal speeds
+  var maxUp = Player.padLaunch ? CONFIG.PAD.maxSpeed : CONFIG.MAX_VERTICAL_SPEED;
   if (Player.vx > CONFIG.MAX_HORIZONTAL_SPEED) Player.vx = CONFIG.MAX_HORIZONTAL_SPEED;
   if (Player.vx < -CONFIG.MAX_HORIZONTAL_SPEED) Player.vx = -CONFIG.MAX_HORIZONTAL_SPEED;
   if (Player.vy > CONFIG.MAX_VERTICAL_SPEED) Player.vy = CONFIG.MAX_VERTICAL_SPEED;
-  if (Player.vy < -CONFIG.MAX_VERTICAL_SPEED) Player.vy = -CONFIG.MAX_VERTICAL_SPEED;
+  if (Player.vy < -maxUp) Player.vy = -maxUp;
 };
 Player.gravity = function () { return CONFIG.GRAVITY * Math.pow(CONFIG.CURSES.lowerGravity.gravityMultiplier, Game.curseCount("lowerGravity")) * Game.levelMods.gravity * Game.mods.gravity; };
 // Real apex (px) of a jump. Mirrors Player.update: the body moves 1px at a time, so each frame rises ceil(speed) px.
@@ -34,6 +38,7 @@ Player.jumpPower = function () {
 };
 Player.update = function () {
   Weapons.update();
+  Player.wrap();
   if (Player.invincibilityTimer > 0) Player.invincibilityTimer--;
   if (Player.dashCooldown > 0) Player.dashCooldown--;
   if (Player.dashTimer > 0) {
@@ -84,7 +89,6 @@ Player.update = function () {
   var stepY = Player.vy > 0 ? 1 : (Player.vy < 0 ? -1 : 0); Player.onGround = false;
   for (var j = 0; j < Math.abs(Player.vy); j++) { if (Collide.hitsSolid(Player.x, Player.y + stepY, size, size)) { if (stepY > 0) { Player.onGround = true; Player.coyoteTimer = CONFIG.COYOTE_TIME_FRAMES; } Player.vy = 0; break; } Player.y += stepY; }
   if (Player.onGround) Level.tryPad(); // jump pads
-  if (Player.x < 0) Player.x = 0;
   Player.clampVelocity();
 };
 Player.isDead = function () { var spikeMargin = Game.levelNumber >= 2 ? CONFIG.LATER_LEVEL_SPIKE_MARGIN : 0; return !Player.isInvincible() && (Player.fakeTesseractHit || Collide.hitsSpike(Player.x + spikeMargin, Player.y + spikeMargin, CONFIG.PLAYER_SIZE - spikeMargin * 2, CONFIG.PLAYER_SIZE - spikeMargin * 2) || Player.y > CONFIG.CANVAS_H + 200); };

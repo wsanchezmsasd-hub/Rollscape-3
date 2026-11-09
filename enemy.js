@@ -86,11 +86,11 @@ Enemy.randomSpawnPoint = function (radius, distance) {
   var spawnDistance = distance == null ? CONFIG.ENEMY_START_DISTANCE : distance;
   var point = {
     x: Math.max(radius, Math.min(Level.pixelWidth() - radius, Player.x + spawnDistance)),
-    y: Math.max(radius, Math.min(CONFIG.CANVAS_H - radius, Player.y - CONFIG.ENEMY_SPAWN_HEIGHT))
+    y: Math.min(CONFIG.CANVAS_H - radius, Player.y - CONFIG.ENEMY_SPAWN_HEIGHT)
   };
   for (var attempt = 0; attempt < 20; attempt++) {
     var x = Math.max(radius, Math.min(Level.pixelWidth() - radius, point.x + (Math.random() - 0.5) * radius * 4)),
-      y = Math.max(radius, Math.min(CONFIG.CANVAS_H - radius, point.y + (Math.random() - 0.5) * radius * 4));
+      y = Math.min(CONFIG.CANVAS_H - radius, point.y + (Math.random() - 0.5) * radius * 4);
     if (!Collide.hitsSolid(x - radius, y - radius, radius * 2, radius * 2)) return { x: x, y: y };
   }
   return point;
@@ -444,13 +444,13 @@ Enemy.aseDestination = function (e) {
   var pcx = Enemy.pcx(), pcy = Enemy.pcy(), r = e.radius, W = Level.pixelWidth();
   var sides = [e.dirX, -e.dirX], distances = [1, 0.85, 0.7], heights = [0, -70, 70];
   for (var s = 0; s < sides.length; s++) for (var i = 0; i < distances.length; i++) for (var h = 0; h < heights.length; h++) {
-    var x = pcx + sides[s] * CONFIG.ASE_TELEPORT_DISTANCE * distances[i], y = Math.max(r, Math.min(CONFIG.CANVAS_H - r, pcy + heights[h]));
+    var x = pcx + sides[s] * CONFIG.ASE_TELEPORT_DISTANCE * distances[i], y = Math.min(CONFIG.CANVAS_H - r, pcy + heights[h]);
     if (x < r || x > W - r) continue;
     if (Math.abs(x - pcx) < CONFIG.ASE_MIN_DISTANCE) continue;
     if (!Collide.hitsSolid(x - r, y - r, r * 2, r * 2)) return { x: x, y: y };
   }
   // Nothing clean: straight ahead, clamped to the map.
-  return { x: Math.max(r, Math.min(W - r, pcx + e.dirX * CONFIG.ASE_TELEPORT_DISTANCE)), y: Math.max(r, Math.min(CONFIG.CANVAS_H - r, pcy)) };
+  return { x: Math.max(r, Math.min(W - r, pcx + e.dirX * CONFIG.ASE_TELEPORT_DISTANCE)), y: Math.min(CONFIG.CANVAS_H - r, pcy) };
 };
 Enemy.updateAse = function (e) {
   var pcx = Enemy.pcx(), pcy = Enemy.pcy(), D = CONFIG.DIM.ase;

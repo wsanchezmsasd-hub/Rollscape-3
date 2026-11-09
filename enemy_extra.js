@@ -36,7 +36,7 @@ Enemy.updateRocket = function (e) {
   var cooldown = Math.round((e.dim ? D.cooldown : B.cooldown) * (e.cd || 1));
   var lead = e.dim ? D.leadFrames : B.leadFrames;
   if (e.rState === undefined) { e.rState = "idle"; e.rTimer = B.startDelay; e.targets = []; }
-  e.y = 16;
+  e.y = Draw.cameraY + 16; // sits at the top of whatever you can see
   if (e.rState === "idle") {
     e.x = Enemy.clamp(Enemy.pcx(), 20, W - 20);
     e.rTimer--;
@@ -58,7 +58,7 @@ Enemy.rocketAim = function (e, lead) {
 Enemy.rocketFire = function (e) {
   var B = CONFIG.ROCKET, D = CONFIG.DIM.rocket, radius = (e.dim ? D.blastRadius : B.blastRadius) * (e.rad || 1);
   for (var k = 0; k < e.targets.length; k++) {
-    Enemy.bullets.push({ kind: "missile", explosive: true, x: e.targets[k], y: -30, vx: 0, vy: B.missileSpeed, life: B.missileLife, wait: e.dim ? k * D.stagger : 0,
+    Enemy.bullets.push({ kind: "missile", explosive: true, x: e.targets[k], y: Draw.cameraY - 30, vx: 0, vy: B.missileSpeed, life: B.missileLife, wait: e.dim ? k * D.stagger : 0,
       blast: radius, lethal: B.blastLethalFrames, blastLife: B.blastLife, fuse: 24, dim: !!e.dim, mold: !!e.moldVariant });
   }
 };
@@ -240,7 +240,7 @@ Enemy.riftSpot = function () {
   var R = CONFIG.CURSES.dimensionalRift, W = Level.pixelWidth(), pcx = Enemy.pcx();
   for (var attempt = 0; attempt < 30; attempt++) {
     var side = Math.random() < 0.5 ? -1 : 1, distance = R.minDistance + Math.random() * (R.maxDistance - R.minDistance);
-    var x = Enemy.clamp(pcx + side * distance, 60, W - 60), y = 70 + Math.random() * (CONFIG.CANVAS_H - 190);
+    var x = Enemy.clamp(pcx + side * distance, 60, W - 60), y = Math.min(CONFIG.CANVAS_H - 70, Enemy.pcy() - 120 + Math.random() * 240);
     if (Math.abs(x - pcx) < R.minDistance * 0.7) continue; // clamped back onto you
     if (!Collide.hitsSolid(x - 28, y - 28, 56, 56)) return { x: x, y: y };
   }

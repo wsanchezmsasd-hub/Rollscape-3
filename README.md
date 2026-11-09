@@ -51,3 +51,6 @@ Walk up to a short pillar and press **F**. *Chance* (random buff / nerf / level 
 
 ### Curse kinds
 Permanent, **Temporary** (lasts N levels), **Greater** (rare, permanent). New: Sub-Zero, Adware, Diamond Cuboid, Moldy Aura, Heartbreaker, AK-47, Tar. See CHANGES.md.
+
+### Edges and height
+The level wraps: leave one side and you appear on the other. Mint mini-platforms (jump pads) launch you extremely high to platforms far above the screen; the camera follows you up. Before level 5 you must take a Greater curse.

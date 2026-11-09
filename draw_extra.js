@@ -13,7 +13,16 @@
      each altar has its own colour
      orange   = Dimensional, green = mold, cyan = invincible (as before)
    ===================================================================== */
-Draw.sparks = []; Draw.trail = []; Draw.shake = 0; Draw.vignetteGradient = null;
+Draw.sparks = []; Draw.trail = []; Draw.shake = 0; Draw.vignetteGradient = null; Draw.cameraY = 0;
+
+// Camera: follows you sideways (clamped to the level) and upward (never below the ground view). It also keeps the mouse's world position current.
+Draw.updateCamera = function () {
+  var W = CONFIG.CANVAS_W, H = CONFIG.CANVAS_H, furthest = Math.max(0, Level.pixelWidth() - W);
+  Draw.cameraX = Math.max(0, Math.min(furthest, Player.x - W / 2));
+  var targetY = Math.min(0, Player.y + CONFIG.PLAYER_SIZE / 2 - H * 0.55);
+  Draw.cameraY = Math.abs(targetY - Draw.cameraY) > 2000 ? targetY : Draw.cameraY + (targetY - Draw.cameraY) * 0.14;
+  Input.mouseX = Input.screenX + Draw.cameraX; Input.mouseY = Input.screenY + Draw.cameraY;
+};
 
 Draw.F = function (px, bold) { return (bold ? "bold " : "") + px + "px Audiowide, monospace"; };
 Draw.hash = function (a, b) { return ((a * 73856093) ^ (b * 19349663)) >>> 0; };
@@ -55,12 +64,11 @@ Draw.everything = function () {
   var sx = Draw.shake > 0.3 ? (Math.random() - 0.5) * Draw.shake * 2 : 0, sy = Draw.shake > 0.3 ? (Math.random() - 0.5) * Draw.shake * 2 : 0;
   Draw.shake *= 0.86;
   ctx.save();
-  ctx.translate(-Draw.cameraX + sx, sy);
+  ctx.translate(-Draw.cameraX + sx, -Draw.cameraY + sy);
   Draw.world();
   Draw.pads();
   Draw.altars();
   Draw.beacon();
-  Draw.rightWall();
   Draw.mold();
   Draw.tarClock();
   Draw.dominoEffects();
@@ -71,6 +79,9 @@ Draw.everything = function () {
   Draw.projectiles();
   Draw.akStuff();
   Draw.player();
+  var W = Level.pixelWidth(), pw = CONFIG.PLAYER_SIZE; // edges wrap: show the other half of the ball on the far side
+  if (Player.x < 40) { ctx.save(); ctx.translate(W, 0); Draw.player(); ctx.restore(); }
+  else if (Player.x + pw > W - 40) { ctx.save(); ctx.translate(-W, 0); Draw.player(); ctx.restore(); }
   Draw.drawSparks();
   ctx.restore();
   Draw.vignette();
@@ -86,7 +97,7 @@ Draw.background = function () {
     ctx.fillStyle = "rgba(157,63,255," + layer.alpha + ")";
     for (var i = first; i < first + Math.ceil(W / layer.gap) + 3; i++) {
       var h = Draw.hash(i, li + 7), w = 26 + (h % 40), ht = layer.base + ((h >> 5) % 150), x = i * layer.gap - offset + ((h >> 11) % 40);
-      ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x, H - ht + 14); ctx.lineTo(x + w / 2, H - ht); ctx.lineTo(x + w, H - ht + 14); ctx.lineTo(x + w, H); ctx.closePath(); ctx.fill();
+      var lift = -Draw.cameraY * layer.speed * 0.6; ctx.beginPath(); ctx.moveTo(x, H + lift); ctx.lineTo(x, H + lift - ht + 14); ctx.lineTo(x + w / 2, H + lift - ht); ctx.lineTo(x + w, H + lift - ht + 14); ctx.lineTo(x + w, H + lift); ctx.closePath(); ctx.fill();
     }
   });
   var glow = ctx.createRadialGradient(W / 2, H + 40, 10, W / 2, H + 40, 380); glow.addColorStop(0, "rgba(199,125,255,0.20)"); glow.addColorStop(1, "rgba(199,125,255,0)");
@@ -102,7 +113,7 @@ Draw.vignette = function () {
 Draw.world = function () {
   var size = CONFIG.TILE, firstCol = Math.floor(Draw.cameraX / size) - 1, lastCol = firstCol + Math.ceil(CONFIG.CANVAS_W / size) + 2, ctx = Draw.ctx;
   var warning = Level.collapseWarning > 0, warningCols = warning ? Level.collapseColumns : null;
-  for (var row = 0; row < CONFIG.ROWS; row++) for (var col = firstCol; col <= lastCol; col++) {
+  for (var row = Math.floor(Draw.cameraY / size) - 1; row < CONFIG.ROWS; row++) for (var col = firstCol; col <= lastCol; col++) {
     var here = Level.charAt(col, row), x = col * size, y = row * size, atRisk = warning && warningCols.indexOf(col) >= 0;
     if (here === "#") { if (atRisk) Draw.blockWarning(x, y, size); else Draw.block(x, y, size); }
     else if (here === "^") { if (atRisk) Draw.spikeWarning(x, y, size); else Draw.spike(x, y, size); }
@@ -192,15 +203,15 @@ Draw.pads = function () {
   for (var k in Level.pads) {
     var p = Level.pads[k]; if (!Level.isSolid(p.c, p.r)) continue;
     var x = p.c * T, y = p.r * T; if (x < left || x > right) continue;
-    var squash = Math.max(0, 1 - (now - p.t) / 220), lift = 7 - squash * 5, bob = 0.5 + 0.5 * Math.sin(now / 260 + p.c);
-    ctx.save(); ctx.shadowColor = "#4dffd2"; ctx.shadowBlur = 12;
-    ctx.fillStyle = "#12302c"; ctx.fillRect(x + 6, y - 3, T - 12, 3);                       // base
-    ctx.strokeStyle = "#4dffd2"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 11, y - 3); // spring
-    for (var z = 0; z < 4; z++) ctx.lineTo(x + (z % 2 ? 11 : T - 11), y - 3 - (lift * (z + 1)) / 4); ctx.stroke();
-    ctx.fillStyle = "#4dffd2"; ctx.fillRect(x + 4, y - 3 - lift - 3, T - 8, 4);              // plate
-    ctx.restore();
-    ctx.save(); ctx.strokeStyle = "#4dffd2"; ctx.lineWidth = 2; ctx.globalAlpha = 0.25 + 0.5 * bob; // little chevrons say "up"
-    for (var c = 0; c < 2; c++) { var cy = y - 20 - c * 9 - bob * 4; ctx.beginPath(); ctx.moveTo(x + T / 2 - 6, cy + 4); ctx.lineTo(x + T / 2, cy - 2); ctx.lineTo(x + T / 2 + 6, cy + 4); ctx.stroke(); }
+    var squash = Math.max(0, 1 - (now - p.t) / 220), bob = 0.5 + 0.5 * Math.sin(now / 260 + p.c);
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; // a faint beam shows it throws you upward
+    var beam = ctx.createLinearGradient(0, y, 0, y - 420); beam.addColorStop(0, "rgba(77,255,210," + (0.22 + 0.1 * bob + squash * 0.3) + ")"); beam.addColorStop(1, "rgba(77,255,210,0)");
+    ctx.fillStyle = beam; ctx.fillRect(x + 6, y - 420, T - 12, 420); ctx.restore();
+    ctx.save(); ctx.shadowColor = "#4dffd2"; ctx.shadowBlur = 14;
+    ctx.fillStyle = "#4dffd2"; ctx.fillRect(x, y - 2 - (1 - squash) * 3, T, 5);                   // glowing launch plate across the top
+    ctx.fillStyle = "rgba(77,255,210,0.35)"; ctx.fillRect(x + 4, y + 6, T - 8, 3); ctx.restore();   // light line on the face of the block
+    ctx.save(); ctx.strokeStyle = "#4dffd2"; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.35 + 0.55 * bob;
+    for (var c = 0; c < 3; c++) { var cy = y - 14 - c * 10 - bob * 5; ctx.beginPath(); ctx.moveTo(x + T / 2 - 7, cy + 5); ctx.lineTo(x + T / 2, cy - 2); ctx.lineTo(x + T / 2 + 7, cy + 5); ctx.stroke(); }
     ctx.restore();
   }
 };

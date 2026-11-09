@@ -1,3 +1,25 @@
+# ROLLSCAPE – content pass 3.1
+
+## Greater curses
+- All three are much harsher, and the curse choice before **level 5** offers ONLY Greater curses (you must take one; `GREATER_REQUIRED_LEVEL`). Altar of Curses pays 40 gold for a Greater curse (was 25).
+- Heartbreaker: 10s start (was 15), +2.5s per tesseract (was +4), 15s cap (was 20).
+- AK-47: 5 damage (was 7), shot cooldown 22 frames (was 12), shorter range, thrown AK hits for 12 and knocks you back 16 (was 6), 4.5s throw cooldown (was 2.5).
+- Tar: wakes after ONE missed cog (was 2), needs 5 cogs to calm (was 3), cogs live 7s and spawn every 8s, chases at 3.6 rising to 7 (was 2.4 to 4.6), bigger clock.
+
+## Diamond Cuboid
+Now extremely slippery: it only ever accelerates (away from you, or toward home) and then slides with friction 0.985 (`CURSES.diamondCuboid`), bouncing off the edges. It settles slowly when it gets home.
+
+## Verticality
+- The camera now follows you upward. The world is taller: platforms sit 600-800px ABOVE the old top of the screen (`VERTICAL.lowestRow / highestRow`, tiles live in `Level.sky`).
+- **Jump pads are now 2-tile mini-platforms** standing on the ground, with a glowing plate and a beam. Stepping on one launches you extremely high (up to speed 40, `PAD.maxSpeed`), tuned per pad to clear its platform by `PAD.margin` (110px). Steer in the air to land on the platform.
+- Mouse aiming accounts for the camera. Rockets and portals follow the camera/you vertically. Enemies can now follow you up.
+- Bug fixed in this pass: a pad could be stacked on another pad.
+
+## Edges wrap
+Walk off the left edge and you come out of the right (and back). Terrain wraps visually, the ball is drawn on both sides while crossing, and the solid right-hand wall is gone. Enemies do not wrap: they chase the long way round.
+
+---
+
 # ROLLSCAPE – content pass 3
 
 New files: `features.js` (all new logic), `draw_extra.js` (the new look + drawing for new content). Both are already in `index.html`. All numbers are in `config.js` (bottom of the file: `BEACON`, `VERTICAL`, `ALTAR`, `TAR`, `CURSES.subZero` ... `CURSES.ak47`).

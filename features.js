@@ -78,54 +78,67 @@ Level.beaconTouched = function () { var b = Level.beacon; return !!b && Level.be
 Level.collapseOver = function () { return Level.goldActive && Level.collapsePieceCursor >= Math.ceil(Level.collapseOrder.length * Math.max(0, Math.min(1, CONFIG.COLLAPSE_MAP_FRACTION))) && Level.collapseWarning <= 0; };
 
 // ================================================================ LEVEL HELPERS
-Level.setChar = function (c, r, ch) { if (r < 0 || r >= CONFIG.ROWS || c < 0 || c >= Level.cols) return; Level.grid[r] = Level.grid[r].substring(0, c) + ch + Level.grid[r].substring(c + 1); };
+Level.setChar = function (c, r, ch) {
+  if (r >= CONFIG.ROWS || Level.cols <= 0) return;
+  c = ((c % Level.cols) + Level.cols) % Level.cols;
+  if (r < 0) { if (ch === ".") delete Level.sky[c + "," + r]; else Level.sky[c + "," + r] = ch; return; }
+  Level.grid[r] = Level.grid[r].substring(0, c) + ch + Level.grid[r].substring(c + 1);
+};
+Level.clearSkyColumns = function (columns) { for (var k in Level.sky) { if (columns.indexOf(parseInt(k.split(",")[0], 10)) >= 0) delete Level.sky[k]; } };
 Level.colFree = function (c, r0, r1) { for (var r = r0; r <= r1; r++) if (Level.charAt(c, r) !== ".") return false; return true; };
 // lowest solid block in a column that has no solid block above it (the "ground" you can stand on), or -1
 Level.bottomSurface = function (c) { for (var r = CONFIG.ROWS - 1; r >= 0; r--) if (Level.charAt(c, r) === "#" && (r === 0 || Level.charAt(c, r - 1) !== "#")) return r; return -1; };
 
-// ---------------------------------------------------------------- verticality: high platforms with tesseracts + a jump pad to reach each
+// ---------------------------------------------------------------- verticality
+// High platforms float far above the top of the screen (the camera follows you up). Each one has a jump pad: a 2-tile mini-platform on the
+// ground that throws you up past it. Platform tiles live in Level.sky (rows < 0).
 Level.addVertical = function () {
-  var V = CONFIG.VERTICAL, P = CONFIG.PIECE_COLS, pieceCount = Math.floor(Level.cols / P);
-  Level.pads = {}; Level.extraSpots = [];
+  var V = CONFIG.VERTICAL, P = CONFIG.PIECE_COLS, pieceCount = Math.floor(Level.cols / P), T = CONFIG.TILE;
+  Level.sky = {}; Level.pads = {}; Level.extraSpots = [];
   Features.shuffle(Features.range(0, pieceCount - 1)).forEach(function (p) {
     if (Level.protectedPieceIndices.indexOf(p) >= 0 || Math.random() > V.platformChance) return;
     var width = V.minWidth + Math.floor(Math.random() * (V.maxWidth - V.minWidth + 1));
+    var platRow = V.highestRow + Math.floor(Math.random() * (V.lowestRow - V.highestRow + 1));
     var offsets = Features.shuffle(Features.range(0, P - width));
     for (var o = 0; o < offsets.length; o++) {
-      var c0 = p * P + offsets[o], c1 = c0 + width - 1, fits = true;
-      for (var c = c0; c <= c1; c++) if (!Level.colFree(c, 1, V.platformRow + 1)) fits = false;
+      var c0 = p * P + offsets[o], c1 = c0 + width - 1, fits = true, c;
+      for (c = c0; c <= c1; c++) if (!Level.colFree(c, platRow - 2, platRow + 1)) fits = false;
+      for (var pk in Level.pads) if (Level.pads[pk].c >= c0 - 1 && Level.pads[pk].c <= c1 + 1) fits = false; // never over an existing pad
       if (!fits) continue;
-      var pad = Level.findPadColumn(c0, c1);
+      var pad = Level.findPadSpot(c0, c1, platRow);
       if (!pad) continue;
-      for (c = c0; c <= c1; c++) Level.setChar(c, V.platformRow, "#");
-      var T = CONFIG.TILE, y = (V.platformRow - 1) * T + T / 2;
+      for (c = c0; c <= c1; c++) Level.setChar(c, platRow, "#");
+      var y = (platRow - 1) * T + T / 2;
       (width >= 4 ? [c0 + 1, c1 - 1] : [c0 + Math.floor(width / 2)]).forEach(function (col) { Level.extraSpots.push({ x: col * T + T / 2, y: y }); });
-      Level.pads[pad.c + "," + pad.r] = { c: pad.c, r: pad.r, h: Math.max(CONFIG.PAD.minHeight, pad.r * T - 80), t: 0 };
+      var h = pad.r * T - platRow * T + CONFIG.PAD.margin;
+      [pad.c, pad.c2].forEach(function (col) { Level.setChar(col, pad.r, "#"); Level.pads[col + "," + pad.r] = { c: col, r: pad.r, h: h, t: 0, platRow: platRow, pc0: c0, pc1: c1 }; });
       return;
     }
   });
 };
-Level.findPadColumn = function (c0, c1) {
+// A pad is two side-by-side blocks standing on the ground (row r = the top block's row). Nothing may be above it up to the platform's row.
+Level.findPadSpot = function (c0, c1, platRow) {
   var cands = [];
   for (var k = 1; k <= CONFIG.VERTICAL.padReach; k++) { cands.push(c0 - k); cands.push(c1 + k); }
   cands = Features.shuffle(cands);
   for (var i = 0; i < cands.length; i++) {
-    var pc = cands[i];
-    if (pc < 1 || pc > Level.cols - 2 || Level.isSpawnColumn(pc)) continue;
-    var r = Level.bottomSurface(pc);
-    if (r < 4 || !Level.colFree(pc, 0, r - 1) || Level.pads[pc + "," + r]) continue;
-    return { c: pc, r: r };
+    var pc = cands[i], pc2 = pc < c0 ? pc - 1 : pc + 1, ground = Level.bottomSurface(pc);
+    if (pc < 2 || pc2 < 2 || pc > Level.cols - 3 || pc2 > Level.cols - 3 || Level.isSpawnColumn(pc) || Level.isSpawnColumn(pc2)) continue;
+    if (ground < 4 || Level.bottomSurface(pc2) !== ground) continue;
+    if (Level.padAt(pc, ground) || Level.padAt(pc2, ground)) continue; // never stack a pad on a pad
+    if (!Level.colFree(pc, platRow, ground - 1) || !Level.colFree(pc2, platRow, ground - 1)) continue;
+    return { c: pc, c2: pc2, r: ground - 1 };
   }
   return null;
 };
 Level.padAt = function (c, r) { var pad = Level.pads && Level.pads[c + "," + r]; return pad && Level.isSolid(c, r) ? pad : null; };
-// Standing on a pad throws you up. The launch speed is solved from the pad's own height, so it works under any gravity.
+// Standing on a pad throws you up. Launch speed is solved from the pad's own height (v = sqrt(2 g h)), and the normal rise cap is lifted for the flight.
 Level.tryPad = function () {
   var pad = Level.padAt(Math.floor((Player.x + CONFIG.PLAYER_SIZE / 2) / CONFIG.TILE), Math.floor((Player.y + CONFIG.PLAYER_SIZE) / CONFIG.TILE));
   if (!pad) return;
-  Player.vy = -Math.min(CONFIG.MAX_VERTICAL_SPEED, Math.sqrt(2 * Player.gravity() * pad.h));
+  Player.vy = -Math.min(CONFIG.PAD.maxSpeed, Math.sqrt(2 * Player.gravity() * pad.h)); Player.padLaunch = true;
   Player.onGround = false; Player.coyoteTimer = 0; pad.t = Date.now();
-  if (typeof Draw !== "undefined" && Draw.burst) Draw.burst(Player.x + CONFIG.PLAYER_SIZE / 2, Player.y + CONFIG.PLAYER_SIZE, "#4dffd2", 10);
+  if (typeof Draw !== "undefined" && Draw.burst) { Draw.burst(Player.x + CONFIG.PLAYER_SIZE / 2, Player.y + CONFIG.PLAYER_SIZE, "#4dffd2", 14); Draw.addShake(3); }
 };
 
 // ---------------------------------------------------------------- altars
@@ -181,25 +194,26 @@ Enemy.ensureDiamond = function () {
   else Enemy.enemies.push(Enemy.makeEnemy("cuboid", Level.beacon.x, Level.beacon.y, D.radius, Infinity, 0, { diamond: true, noBody: true, noHit: true, state: "approach", windup: 0 }));
   if (typeof Draw !== "undefined" && Draw.burst) Draw.burst(Level.beacon.x, Level.beacon.y, "#bff6ff", 24);
 };
+// Slippery on purpose: it only ever ACCELERATES (away from you, or toward home) and then keeps sliding with very little friction,
+// bouncing off the edges. It is hard to herd and hard to stop.
 Enemy.updateDiamond = function (e) {
-  var D = CONFIG.CURSES.diamondCuboid, W = Level.pixelWidth(), r = e.radius;
+  var D = CONFIG.CURSES.diamondCuboid, W = Level.pixelWidth(), r = e.radius, ax = 0, ay = 0, friction = D.friction;
+  if (e.dvx === undefined) { e.dvx = 0; e.dvy = 0; }
   e.angle += 0.012;
-  if (Level.collapseOver()) { // spawn is the last piece: come home and wait above the platform
-    var hx = Level.beacon.x - e.x, hy = Level.beacon.y - e.y, hd = Math.hypot(hx, hy) || 1, step = Math.min(hd, D.returnSpeed);
-    e.x += hx / hd * step; e.y += hy / hd * step;
-    return;
+  if (Level.collapseOver()) { // spawn is the last piece: slide home and settle above the platform
+    var hx = Level.beacon.x - e.x, hy = Level.beacon.y - e.y, hd = Math.hypot(hx, hy) || 1;
+    ax = hx / hd * D.homeAccel; ay = hy / hd * D.homeAccel;
+    if (hd < 90) friction = D.homeSettle;
+  } else {
+    var dx = e.x - Enemy.pcx(), dy = e.y - Enemy.pcy(), d = Math.hypot(dx, dy) || 1;
+    if (d < D.fleeRange) { var push = D.accel * (1 + (1 - d / D.fleeRange) * 0.6); ax = dx / d * push; ay = dy / d * push; }
+    else { ax = (Level.beacon.x - e.x) * 0.00008; ay = (150 - e.y) * 0.0004; } // idle: barely drifting toward the middle
   }
-  var dx = e.x - Enemy.pcx(), dy = e.y - Enemy.pcy(), d = Math.hypot(dx, dy) || 1;
-  if (d < D.fleeRange) {
-    var speed = D.fleeSpeed * (1 + (1 - d / D.fleeRange) * 0.4), mx = dx / d * speed, my = dy / d * speed;
-    // cornered against a wall or the ceiling/floor: slide along it instead of sitting still
-    if ((e.x - r < 8 && mx < 0) || (e.x + r > W - 8 && mx > 0)) { mx = 0; my = (dy >= 0 ? 1 : -1) * speed; }
-    if ((e.y - r < 24 && my < 0) || (e.y + r > 330 && my > 0)) { my = 0; mx = (dx >= 0 ? 1 : -1) * speed; }
-    e.x += mx; e.y += my;
-  } else { // idle drift toward the middle of the arena
-    e.x += (Level.beacon.x - e.x) * 0.0015; e.y += (150 - e.y) * 0.01;
-  }
-  e.x = Enemy.clamp(e.x, r, W - r); e.y = Enemy.clamp(e.y, r + 20, 330 - r);
+  e.dvx = (e.dvx + ax) * friction; e.dvy = (e.dvy + ay) * friction;
+  var speed = Math.hypot(e.dvx, e.dvy); if (speed > D.maxSpeed) { e.dvx *= D.maxSpeed / speed; e.dvy *= D.maxSpeed / speed; }
+  e.x += e.dvx; e.y += e.dvy;
+  if (e.x < r) { e.x = r; e.dvx = Math.abs(e.dvx) * D.bounce; } else if (e.x > W - r) { e.x = W - r; e.dvx = -Math.abs(e.dvx) * D.bounce; }
+  if (e.y < r + 20) { e.y = r + 20; e.dvy = Math.abs(e.dvy) * D.bounce; } else if (e.y > 330 - r) { e.y = 330 - r; e.dvy = -Math.abs(e.dvy) * D.bounce; }
 };
 Enemy.diamondTouched = function () { var e = Enemy.diamondOf(); return !!e && Math.hypot(Enemy.pcx() - e.x, Enemy.pcy() - e.y) < e.radius + CONFIG.PLAYER_RADIUS; };
 

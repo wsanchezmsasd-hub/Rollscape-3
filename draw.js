@@ -12,7 +12,6 @@ Draw.dominoEasterEggImage = new Image();
 Draw.dominoEasterEggImage.src = "https://pbs.twimg.com/profile_images/1907274219173404672/eIWDuAGg_400x400.jpg";
 
 Draw.setup = function () { Draw.canvas = document.getElementById("game"); Draw.ctx = Draw.canvas.getContext("2d"); Draw.initParticles(); };
-Draw.updateCamera = function () { Draw.cameraX = Player.x - CONFIG.CANVAS_W / 2; if (Draw.cameraX < 0) Draw.cameraX = 0; var furthest = Level.pixelWidth() - CONFIG.CANVAS_W; if (furthest < 0) furthest = 0; if (Draw.cameraX > furthest) Draw.cameraX = furthest; };
 
 Draw.initParticles = function () {
   Draw.particles = [];
@@ -335,9 +334,4 @@ Draw.jetFlame = function () {
   var ctx = Draw.ctx, cx = Player.x + CONFIG.PLAYER_SIZE / 2, by = Player.y + CONFIG.PLAYER_SIZE, flick = 10 + Math.random() * 10;
   ctx.save(); ctx.fillStyle = "#ff9f1c"; ctx.beginPath(); ctx.moveTo(cx - 7, by - 2); ctx.lineTo(cx + 7, by - 2); ctx.lineTo(cx, by + flick); ctx.closePath(); ctx.fill();
   ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(cx - 3, by - 2); ctx.lineTo(cx + 3, by - 2); ctx.lineTo(cx, by + flick * 0.5); ctx.closePath(); ctx.fill(); ctx.restore();
-};
-Draw.rightWall = function () {
-  var size = CONFIG.TILE, x = Level.cols * size;
-  if (x < Draw.cameraX - size || x > Draw.cameraX + CONFIG.CANVAS_W + size) return;
-  for (var row = 0; row < CONFIG.ROWS; row++) Draw.block(x, row * size, size);
 };

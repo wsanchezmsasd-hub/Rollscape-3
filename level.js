@@ -2,6 +2,7 @@
    level.js  --  BUILDING THE WORLD OUT OF PIECES.
    ===================================================================== */
 var Level = {
+  sky: {}, pads: {}, altars: [], extraSpots: [], iceCols: {}, iceBuilt: false, beacon: null,
   pieces: null, levels: null, grid: [], cols: 0, name: "", startX: 0, startY: 0, spawnStartCol: 0, spawnEndCol: -1, protectedPieceIndices: [], collapseOrder: [], collapsePieceCursor: 0,
   redTesseracts: [], goldTesseracts: [], fakeTesseracts: [], goldActive: false, collapseActive: false, collapseTimer: 0, collapseWarning: 0, collapseColumn: -1, collapseColumns: []
 };
@@ -212,6 +213,8 @@ Level.finishCollapse = function () {
     Level.grid[row] = rowChars.join("");
   }
 
+  Level.clearSkyColumns(columns); // high platforms above the collapsing columns go too
+
   // Gold tesseracts caught inside the collapsing zone are deleted, not just uncollectable.
   for (var g = Level.goldTesseracts.length - 1; g >= 0; g--) {
     var tesseract = Level.goldTesseracts[g];
@@ -231,8 +234,14 @@ Level.findStart = function () {
   }
   Level.startX = 0; Level.startY = 0;
 };
-Level.charAt = function (col, row) { if (row < 0 || row >= CONFIG.ROWS || col < 0 || col >= Level.cols) return "."; return Level.grid[row].charAt(col); };
-Level.isSolid = function (col, row) { if (col >= Level.cols) return true; /* right-hand wall */ return Level.charAt(col, row) === "#"; };
+// The world is a cylinder: columns wrap around (walk off one edge, come out the other). Rows above the grid (row < 0) hold the high platforms (Level.sky).
+Level.charAt = function (col, row) {
+  if (row >= CONFIG.ROWS || Level.cols <= 0) return ".";
+  col = ((col % Level.cols) + Level.cols) % Level.cols;
+  if (row < 0) return Level.sky[col + "," + row] || ".";
+  return Level.grid[row].charAt(col);
+};
+Level.isSolid = function (col, row) { return Level.charAt(col, row) === "#"; };
 Level.isSpawnColumn = function (col) { return Level.protectedPieceIndices.indexOf(Math.floor(col / CONFIG.PIECE_COLS)) >= 0; };
 Level.isSpike = function (col, row) { return Level.charAt(col, row) === "^"; };
 Level.isFinish = function () { return false; }; // the finish is the beacon now (see features.js)
@@ -242,7 +251,7 @@ Level.destroyCircle = function (x, y, radius) {
   for (var row = firstRow; row <= lastRow; row++) for (var col = firstCol; col <= lastCol; col++) {
     var centerX = col * CONFIG.TILE + CONFIG.TILE / 2, centerY = row * CONFIG.TILE + CONFIG.TILE / 2;
     if (Math.hypot(centerX - x, centerY - y) <= radius && Level.charAt(col, row) === "#" && !Level.isSpawnColumn(col)) {
-      if (row >= 0 && row < CONFIG.ROWS && col >= 0 && col < Level.cols) Level.grid[row] = Level.grid[row].substring(0, col) + "." + Level.grid[row].substring(col + 1);
+      if (row < CONFIG.ROWS) Level.setChar(col, row, ".");
     }
   }
   var playerX = Player.x + CONFIG.PLAYER_SIZE / 2, playerY = Player.y + CONFIG.PLAYER_SIZE / 2;

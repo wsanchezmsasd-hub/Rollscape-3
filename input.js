@@ -15,7 +15,9 @@ var Input = {
   interact: false,
   mouseDown: false,
   mouseX: 0,
-  mouseY: 0
+  mouseY: 0,
+  screenX: 0, // mouse position on the canvas; mouseX/Y (world) are recomputed every frame from these + the camera
+  screenY: 0
 };
 
 window.addEventListener("keydown", function (event) {
@@ -33,8 +35,10 @@ window.addEventListener("mousedown", function (event) { if (event.button === 0) 
 window.addEventListener("mouseup", function (event) { if (event.button === 0) Input.mouseDown = false; });
 window.addEventListener("mousemove", function (event) {
   var rect = document.getElementById("game").getBoundingClientRect();
-  Input.mouseX = (event.clientX - rect.left) * CONFIG.CANVAS_W / rect.width + Draw.cameraX;
-  Input.mouseY = (event.clientY - rect.top) * CONFIG.CANVAS_H / rect.height;
+  Input.screenX = (event.clientX - rect.left) * CONFIG.CANVAS_W / rect.width;
+  Input.screenY = (event.clientY - rect.top) * CONFIG.CANVAS_H / rect.height;
+  Input.mouseX = Input.screenX + Draw.cameraX;
+  Input.mouseY = Input.screenY + Draw.cameraY;
 });
 
 function setKey(key, isDown) {
